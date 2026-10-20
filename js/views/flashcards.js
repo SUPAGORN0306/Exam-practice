@@ -3,9 +3,9 @@
   window.App = window.App || {};
   App.views = App.views || {};
 
-  var cards = []; // การ์ดที่ยังไม่ได้เรียนรู้ (ที่เหลืออยู่ในกอง)
-  var totalCardsCount = 0; // จำนวนการ์ดทั้งหมดตอนเริ่ม
-  var understoodCount = 0; // 🔥 จำนวนการ์ดที่ "เข้าใจแล้ว" (ปัดถูก/ปัดขวา)
+  var cards = []; // การ์ดที่ยังไม่ได้เรียนรู้
+  var totalCardsCount = 0; 
+  var understoodCount = 0; // จำนวนที่ปัดขวา (เข้าใจ)
   var currentIndex = 0;
   var flipped = false;
 
@@ -257,8 +257,8 @@
     }
     cards = merged;
     
-    totalCardsCount = cards.length; // เก็บจำนวนทั้งหมด
-    understoodCount = 0; // รีเซ็ตจำนวนที่เข้าใจ
+    totalCardsCount = cards.length; 
+    understoodCount = 0; 
     currentIndex = 0;
     flipped = false;
 
@@ -269,37 +269,27 @@
     var el = App.el;
     while (root.firstChild) root.removeChild(root.firstChild);
 
-    // 🔥 Header: ปุ่มออก + ตัวเลขสถิติ (อยู่ด้านนอกการ์ด)
+    // Header: ปุ่มออก + ตัวเลขสถิติ
     root.appendChild(el('div', {
       class: 'session-top',
       style: 'display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;'
     }, [
       el('button', { class: 'icon-btn', text: '✕', onclick: function () { App.navigate('home'); } }),
-      
-      // 🔥 ตัวเลขสถิติ (เข้าใจแล้ว / ทั้งหมด)
-      el('div', { 
-        class: 'small muted', 
-        style: 'font-weight:600; font-variant-numeric: tabular-nums; font-size:1.1rem;', 
-        text: understoodCount + ' / ' + totalCardsCount 
-      }),
-      
-      el('div', { style: 'width:48px;' }) // ดันให้อยู่ตรงกลาง
+      el('div', { class: 'small muted', style: 'font-weight:600; font-variant-numeric: tabular-nums; font-size:1.1rem;', text: understoodCount + ' / ' + totalCardsCount }),
+      el('div', { style: 'width:48px;' })
     ]));
 
     var q = cards[currentIndex];
 
-    // touch-action: none เพื่อให้มือถือปัดได้
     var scene = el('div', { class: 'flashcard-scene', style: 'touch-action: none;' });
     var inner = el('div', { class: 'flashcard-inner' + (flipped ? ' is-flipped' : '') });
 
-    // หน้าแรก (Front) - เอาตัวเลขสถิติออกแล้ว
     var front = el('div', { class: 'flashcard-front' }, [
       el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic }),
       el('h2', { style: 'margin-top:16px; white-space:pre-wrap;', text: q.question }),
       el('p', { class: 'muted', style: 'margin-top:32px; font-size:0.9rem;', text: 'แตะเพื่อพลิกดูเฉลย' })
     ]);
 
-    // หน้าหลัง (Back) - เอาตัวเลขสถิติออกแล้ว
     var back = el('div', { class: 'flashcard-back' }, [
       el('div', { class: 'small muted', text: 'เฉลย' }),
       el('h2', { style: 'margin-top:12px; color: var(--correct);', text: q.choices[q.answer] }),
@@ -315,20 +305,18 @@
     root.appendChild(scene);
 
     var isDragging = false;
+    var startX = 0, startY = 0, currentX = 0, currentY = 0;
+    // 🔥 ลด Threshold ลงเหลือ 40px (ปัดนิดเดียวก็ติด)
+    var swipeThreshold = 40; 
 
-    inner.addEventListener('click', function () {
+    inner.addEventListener('click', function (e) {
       if (isDragging) return;
       flipped = !flipped;
       inner.classList.toggle('is-flipped', flipped);
     });
 
-    var startX = 0, startY = 0, currentX = 0, currentY = 0;
-    var swipeThreshold = 80;
-
     scene.addEventListener('pointerdown', function (e) {
       if (e.target.closest('button')) return;
-      
-      // สั่งหยุด Scroll หน้าจอทันที
       if (e.cancelable) e.preventDefault(); 
       
       isDragging = true;
@@ -337,23 +325,30 @@
       currentX = 0;
       currentY = 0;
       inner.style.transition = 'none';
-      scene.setPointerCapture(e.pointerId);
+      
+      // 🔥 ใช้ window แทน scene เพื่อให้จับการลากได้ลื่นไหลไม่หลุดขอบ
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
     });
 
-    scene.addEventListener('pointermove', function (e) {
+    function onPointerMove(e) {
       if (!isDragging) return;
       currentX = e.clientX - startX;
       currentY = e.clientY - startY;
 
       if (Math.abs(currentX) > Math.abs(currentY)) {
+        if (e.cancelable) e.preventDefault(); // ป้องกันการสกอลล์ตอนลากแนวนอน
         var rotate = currentX * 0.05;
         inner.style.transform = 'translateX(' + currentX + 'px) rotate(' + rotate + 'deg)';
       }
-    });
+    }
 
-    scene.addEventListener('pointerup', function (e) {
+    function onPointerUp(e) {
       if (!isDragging) return;
       isDragging = false;
+
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
 
       var shouldSwipe = currentX < -swipeThreshold ? 'left'
                       : currentX > swipeThreshold  ? 'right'
@@ -366,19 +361,10 @@
         inner.style.transform = '';
       }
       currentX = 0; currentY = 0;
-    });
+    }
 
-    scene.addEventListener('pointercancel', function () {
-      if (!isDragging) return;
-      isDragging = false;
-      inner.style.transition = '';
-      inner.style.transform = '';
-      currentX = 0; currentY = 0;
-    });
-
-    // 🔥 ปุ่มควบคุมด้านล่าง: [ < ] [ สุ่มข้อ ] [ > ]
-    var isLastCard = (currentIndex === cards.length - 1);
-
+    // 🔥 ลบปุ่ม Submit/จบการทบทวนออกหมดแล้ว
+    // มีแค่ปุ่ม < , สุ่มข้อ , > สำหรับคนไม่สะดวกปัด
     root.appendChild(el('div', { class: 'row', style: 'margin-top:24px; justify-content:center; gap:16px;' }, [
       
       // ย้อนกลับ
@@ -411,23 +397,17 @@
         }
       }),
 
-      // ไปข้างหน้า / จบการทบทวน
-      isLastCard ? 
-        el('button', { 
-          class: 'btn btn-primary', style: 'min-width:120px;', text: 'จบการทบทวน',
-          onclick: function () { App.views.flashcards(root); }
-        })
-        :
-        el('button', { 
-          class: 'icon-btn', 
-          style: 'width:48px; height:48px; font-size:1.5rem;',
-          text: '>',
-          onclick: function () {
-            currentIndex = (currentIndex + 1) % cards.length;
-            flipped = false;
-            renderCard(root);
-          }
-        })
+      // ไปข้างหน้า
+      el('button', { 
+        class: 'icon-btn', 
+        style: 'width:48px; height:48px; font-size:1.5rem;',
+        text: '>',
+        onclick: function () {
+          currentIndex = (currentIndex + 1) % cards.length;
+          flipped = false;
+          renderCard(root);
+        }
+      })
     ]));
   }
 
@@ -442,17 +422,16 @@
     inner.classList.add(direction === 'left' ? 'swipe-left' : 'swipe-right');
 
     setTimeout(function () {
-      // อัปเดต Leitner
       updateBox(q, direction === 'right');
       
-      // 🔥 ถ้าปัดขวา (จำได้) ให้เพิ่มจำนวนที่เข้าใจแล้ว
       if (direction === 'right') {
         understoodCount++;
       }
       
-      // เอาออกจากกอง
+      // เอาการ์ดออกจากกอง
       cards.splice(currentIndex, 1);
       
+      // 🔥 ถ้าไม่มีข้อสอบเหลือแล้ว (ปัดขวาจนหมด) ค่อยกลับไปหน้าหลัก
       if (cards.length === 0) {
         App.toast('ทบทวนครบทุกใบแล้ว');
         App.views.flashcards(root);

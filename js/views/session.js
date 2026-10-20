@@ -89,14 +89,14 @@
 
     var order = session.choiceOrders[q.id] || q.choices.map(function (_, i) { return i; });
     
-    // 🔥 ค้นหาคำตอบที่เคยเลือกไว้ (ทั้งที่ดูเฉลยแล้ว และยังไม่ดูเฉลย)
+    // 🔥 ค้นหาข้อมูลที่เคยตอบไว้
     var existing = session.answers.find(function (a) { 
       return a.qid === q.id && String(a.isRecheck) === String(current.isRecheck); 
     });
     
     var isScrollMode = (localStorage.getItem('answerMode') || 'button') === 'scroll';
 
-    // --- Top bar (แถวเดียว) ---
+    // --- Top bar ---
     var isTimed = session.timer.mode === 'timed';
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs || session.timer.elapsedMs || 0) });
     var totalEl = el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: isTimed ? formatMs(session.timer.totalMs) : '' });
@@ -142,9 +142,9 @@
       el('p', { style: 'font-size:var(--font-question); white-space:pre-wrap; word-break:break-word; margin-top:8px;', text: q.question })
     ]);
 
-    // 🔥 ตรวจสอบคำตอบที่เคยเลือกไว้
+    // 🔥 ดึงสถานะการเลือก (chosen) และการดูเฉลย (revealed)
     var chosen = existing ? existing.chosen : null;
-    var revealed = existing ? !!existing.confidence : false; // ดูเฉลยแล้วหรือยัง (ถ้ามี confidence ถือว่าดูแล้ว)
+    var revealed = existing ? !!existing.confidence : false;
 
     var choicesWrap = el('div', { style: 'margin-top:12px;' });
     
@@ -157,15 +157,19 @@
           if (revealed) return;
           chosen = origIdx;
           
-          // 🔥 เซฟคำตอบลง Session ทันที (เผื่อเปลี่ยนข้อแล้วกลับมา)
+          // 🔥 เซฟคำตอบทันที (เพื่อให้กลับมาแล้วจำได้)
           var s = App.storage.getActiveSession();
+          if (!s) return;
           var cq = s.queue[s.index];
-          var tempExisting = s.answers.find(function(a) { return a.qid === q.id && String(a.isRecheck) === String(cq.isRecheck); });
+          var tempAnswer = s.answers.find(function(a) { 
+            return a.qid === q.id && String(a.isRecheck) === String(cq.isRecheck); 
+          });
           
-          if (!tempExisting) {
-             s.answers.push({ qid: q.id, chosen: chosen, confidence: null, isRecheck: cq.isRecheck, correct: null });
+          if (!tempAnswer) {
+             tempAnswer = { qid: q.id, chosen: chosen, confidence: null, isRecheck: cq.isRecheck, correct: null };
+             s.answers.push(tempAnswer);
           } else {
-             tempExisting.chosen = chosen;
+             tempAnswer.chosen = chosen;
           }
           App.storage.setActiveSession(s);
 
@@ -183,7 +187,7 @@
         if (origIdx === q.answer) btn.classList.add('correct');
         if (origIdx === chosen && chosen !== q.answer) btn.classList.add('wrong');
       } else if (chosen === origIdx) {
-        btn.classList.add('selected'); // 🔥 ทำให้ติดสีเมื่อกลับมา
+        btn.classList.add('selected');
       }
       choicesWrap.appendChild(btn);
     });
@@ -217,10 +221,9 @@
     root.appendChild(card);
     root.appendChild(bottomWrap);
 
-    // 🔥 ปุ่ม Navigation ชิดซ้าย-ขวา ล่างสุด
+    // 🔥 ปุ่ม Navigation ด้านล่าง
     var isLastQ = (session.index === session.queue.length - 1);
-    
-    root.appendChild(el('div', { style: 'display:flex; justify-content:space-between; margin-top:32px; margin-bottom:24px;' }, [
+    root.appendChild(el('div', { style: 'display:flex; justify-content:space-between; margin-top:24px; margin-bottom:24px;' }, [
       el('button', {
         class: 'icon-btn', 'aria-label': 'ย้อนกลับ', text: '<',
         style: 'width:56px; height:56px; font-size:1.5rem;' + (session.index === 0 ? 'opacity:0.3; pointer-events:none;' : ''),
@@ -239,7 +242,7 @@
         el('button', { class: 'icon-btn', 'aria-label': 'ข้อถัดไป', text: '>', style: 'width:56px; height:56px; font-size:1.5rem;', onclick: function () { goNext(session); } })
     ]));
 
-    // 🔥 Floating Submit Button (สำหรับโหมด Scroll)
+    // 🔥 Floating Submit Button
     if (isLastQ && isScrollMode) {
       root.appendChild(el('button', {
         class: 'btn btn-primary',
@@ -258,7 +261,6 @@
     var type = App.scheduler.classifyAnswer(correct, confidence);
     var timeMs = 1000; 
 
-    // อัปเดตข้อมูลเดิม
     var existing = session.answers.find(function(a) { 
       return a.qid === q.id && String(a.isRecheck) === String(current.isRecheck); 
     });
@@ -269,7 +271,6 @@
       existing.type = type;
     }
 
-    // บันทึก Leitner
     if (!current.isRecheck) {
       var progress = App.storage.getProgress();
       var prev = progress[q.id] || {};
@@ -377,7 +378,6 @@
 
   function finishSession(session) {
     clearTimer();
-    // 🔥 ดึงเฉพาะข้อที่กดดูเฉลยแล้ว (มี confidence) ไปคำนวณผลสรุป
     var first = session.answers.filter(function (a) { return !a.isRecheck && a.confidence; });
     var correct = first.filter(function (a) { return a.correct; }).length;
 

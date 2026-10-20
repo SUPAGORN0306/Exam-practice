@@ -27,7 +27,7 @@
       backupSnoozeUntil: settings.backupSnoozeUntil
     })) {
       root.appendChild(el('div', { class: 'banner warn' }, [
-        el('div', { class: 'icon', text: '⚠' }),
+        el('div', { class: 'icon', text: '!' }),
         el('div', { style: 'flex:1;' }, [
           el('strong', { text: 'ยังไม่ได้สำรองข้อมูล' }),
           el('p', { class: 'small', style: 'margin:4px 0 8px;', text: 'ข้อมูลอยู่ในเบราว์เซอร์นี้เท่านั้น ถ้าล้างข้อมูลจะหาย' }),
@@ -129,12 +129,21 @@
           App.views.session.startNew(result.ids, result.meta);
           App.render();
         }
-      }),
-      // ✅ เพิ่มปุ่มแฟลชการ์ดตรงนี้
+      })
+    ]));
+
+    // ---- Flashcards Card (แยกออกมาเป็น Card ของตัวเอง) ----
+    root.appendChild(el('div', { class: 'card' }, [
+      el('div', { class: 'row-between' }, [
+        el('div', { style: 'flex:1; min-width:0;' }, [
+          el('h3', { text: 'ท่องจำด้วยแฟลชการ์ด' }),
+          el('p', { class: 'muted small', style: 'margin:4px 0 0;', text: 'ปัดซ้าย-ขวาเพื่อทบทวนการ์ด พร้อมระบบ Leitner' })
+        ])
+      ]),
       el('button', {
         class: 'btn btn-block',
-        style: 'margin-top:8px;',
-        text: '🃏 ฝึกแฟลชการ์ด',
+        style: 'margin-top:12px;',
+        text: '▣ ฝึกแฟลชการ์ด',
         onclick: function () {
           window.location.hash = '#/flashcards';
         }
@@ -172,7 +181,7 @@
         el('div', null, [ring, ringLabel]),
         el('div', null, [
           el('p', { class: 'muted small', style: 'margin:0;', text: 'ตอบไปแล้ววันนี้ ' + answeredToday + ' ข้อ' }),
-          el('p', { class: 'small', style: 'margin:6px 0 0; font-weight:600;', text: '🔥 สตรีค ' + streak + ' วันติดกัน' })
+          el('p', { class: 'small', style: 'margin:6px 0 0; font-weight:600;', text: 'สตรีค ' + streak + ' วันติดกัน' })
         ])
       ])
     ]));
@@ -232,14 +241,27 @@
     });
     var selectedTopic = '';
     var n = chosenN;
+    
+    // 🔥 ล็อค Scroll ด้านหลัง
+    document.body.style.overflow = 'hidden';
+
     var overlay = el('div', {
       style: 'position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:50;',
-      onclick: function (e) { if (e.target === overlay) document.body.removeChild(overlay); }
+      onclick: function (e) { 
+        if (e.target === overlay) closeSheet(); 
+      }
     });
+
     var sheet = el('div', {
-      style: 'position:fixed; left:0; right:0; bottom:0; background:var(--surface); border-radius:20px 20px 0 0; padding:20px; z-index:51; max-height:80vh; overflow-y:auto;'
+      style: 'position:fixed; left:0; right:0; bottom:0; background:var(--surface); border-radius:20px 20px 0 0; padding:20px; padding-bottom: calc(20px + env(safe-area-inset-bottom)); z-index:51; max-height:80vh; overflow-y:auto;'
     });
-    sheet.appendChild(el('h2', { text: 'ฝึก ' + subject.name }));
+
+    // 🔥 Header ของ Sheet + ปุ่มปิด
+    sheet.appendChild(el('div', { class: 'row-between', style: 'margin-bottom:16px;' }, [
+      el('h2', { text: 'ฝึก ' + subject.name, style: 'margin:0;' }),
+      el('button', { class: 'icon-btn', text: '✕', 'aria-label': 'ปิด', onclick: closeSheet })
+    ]));
+
     sheet.appendChild(el('p', { class: 'muted small', text: 'เลือกบท (ไม่บังคับ)' }));
     var topicSelect = el('select', { class: 'select' });
     topicSelect.appendChild(el('option', { value: '', text: 'ทุกบท' }));
@@ -272,12 +294,17 @@
           n: n, filter: { subject: subject.id, topics: selectedTopic ? [selectedTopic] : [] }
         });
         if (!res.ids.length) { App.toast('ไม่มีข้อในเงื่อนไขนี้'); return; }
-        document.body.removeChild(overlay);
+        closeSheet();
         App.views.session.startNew(res.ids, res.meta);
         App.render();
       }
     }));
     overlay.appendChild(sheet);
     document.body.appendChild(overlay);
+
+    function closeSheet() {
+      document.body.style.overflow = ''; // คืนค่า Scroll
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
   }
 })();
