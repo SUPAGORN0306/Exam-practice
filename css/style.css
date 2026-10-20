@@ -357,7 +357,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   perspective: 1000px;
   margin-top: 12px;
   position: relative;
-  touch-action: pan-y; /* เพื่อให้ใช้ swipe ได้ */
 }
 
 .flashcard-inner {
@@ -482,6 +481,27 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* ระยะห่างของแถวปุ่มลัดจำนวนข้อ */
 #fc-limit-container {
   margin-top: 4px;
+}
+
+/* 🔥 สไตล์ตัวเลขสถิติบนการ์ด (อยู่ตรงกลาง) */
+.flashcard-stat {
+  background: var(--border);
+  color: var(--text);
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  display: inline-block; 
+  margin: 8px auto 0; /* ดันให้อยู่ตรงกลาง */
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  z-index: 5;
+}
+
+/* รองรับโหมดมืด */
+html[data-theme='dark'] .flashcard-stat {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 @media (prefers-reduced-motion: reduce) {

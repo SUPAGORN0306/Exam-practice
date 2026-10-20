@@ -1,4 +1,4 @@
-/* Flashcards mode — Swipe (Leitner) + Arrow Navigation + Submit */
+/* Flashcards mode — Swipe (Leitner) + Arrow Navigation + Submit + Stat */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -265,7 +265,7 @@
     var el = App.el;
     while (root.firstChild) root.removeChild(root.firstChild);
 
-    // 🔥 Header แบบมินิมอล
+    // Header แบบมินิมอล
     root.appendChild(el('div', {
       class: 'session-top',
       style: 'display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;'
@@ -276,18 +276,30 @@
     ]));
 
     var q = cards[currentIndex];
+    var cardStat = (currentIndex + 1) + ' / ' + cards.length; // 🔥 คำนวณสถิติ
 
-    var scene = el('div', { class: 'flashcard-scene' });
+    // 🔥 touch-action: none เพื่อให้มือถือปัดได้
+    var scene = el('div', { class: 'flashcard-scene', style: 'touch-action: none;' });
     var inner = el('div', { class: 'flashcard-inner' + (flipped ? ' is-flipped' : '') });
 
+    // หน้าแรก (Front)
     var front = el('div', { class: 'flashcard-front' }, [
       el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic }),
+      
+      // 🔥 ตัวเลขสถิติ ตรงกลาง
+      el('div', { class: 'flashcard-stat', text: cardStat }),
+      
       el('h2', { style: 'margin-top:16px; white-space:pre-wrap;', text: q.question }),
       el('p', { class: 'muted', style: 'margin-top:32px; font-size:0.9rem;', text: 'แตะเพื่อพลิกดูเฉลย' })
     ]);
 
+    // หน้าหลัง (Back)
     var back = el('div', { class: 'flashcard-back' }, [
       el('div', { class: 'small muted', text: 'เฉลย' }),
+      
+      // 🔥 ตัวเลขสถิติ ตรงกลาง
+      el('div', { class: 'flashcard-stat', text: cardStat }),
+
       el('h2', { style: 'margin-top:12px; color: var(--correct);', text: q.choices[q.answer] }),
       el('div', { style: 'margin-top:16px; text-align:left; width:100%; background:var(--bg); padding:16px; border-radius:12px;' }, [
         el('div', { class: 'small muted', text: 'คำอธิบาย:' }),
@@ -313,6 +325,8 @@
 
     scene.addEventListener('pointerdown', function (e) {
       if (e.target.closest('button')) return;
+      if (e.cancelable) e.preventDefault(); // 🔥 หยุด Scroll
+      
       isDragging = true;
       startX = e.clientX;
       startY = e.clientY;

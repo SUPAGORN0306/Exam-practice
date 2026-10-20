@@ -20,7 +20,6 @@
   }
 
   function render() {
-    // 🔥 ล้างตัวจับเวลาเก่าเสมอเมื่อเปลี่ยนหน้า
     if (window.App.views.session && window.App.views.session.clearTimer) {
       window.App.views.session.clearTimer();
     }
@@ -134,7 +133,7 @@
     App.storage.setCauses(causes);
   }
 
-  // 🔥 Hamburger Menu
+  // 🔥 Hamburger Menu (ไม่มีปุ่มปิดเมนูแล้ว)
   function initMenu() {
     var btn = document.getElementById('menu-toggle');
     if (!btn) return;
@@ -179,13 +178,6 @@
       })()
     ]));
 
-    menu.appendChild(el('button', { 
-      class: 'btn btn-primary', 
-      style: 'margin-top:auto;', 
-      text: 'ปิดเมนู', 
-      onclick: function() { overlay.classList.add('hidden'); }
-    }));
-
     overlay.appendChild(menu);
     document.body.appendChild(overlay);
 
@@ -193,6 +185,7 @@
       overlay.classList.remove('hidden');
     });
     
+    // 🔥 คลิกพื้นที่ว่างเพื่อปิด
     overlay.addEventListener('click', function(e) {
       if (e.target === overlay) overlay.classList.add('hidden');
     });
