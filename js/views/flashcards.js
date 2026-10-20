@@ -1,4 +1,4 @@
-/* Flashcards mode — Swipe (Leitner) + Arrow Navigation (Loop) + Random */
+/* Flashcards mode — Swipe (Leitner) + Arrow Navigation + Submit */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -148,7 +148,6 @@
       }
 
       topicNames.forEach(function (t) {
-        // 🔥 ใช้ .chip แทน checkbox
         var isSel = selectedChapters.indexOf(t) !== -1;
         var chip = el('div', { 
           class: 'chip' + (isSel ? ' selected' : ''),
@@ -266,14 +265,14 @@
     var el = App.el;
     while (root.firstChild) root.removeChild(root.firstChild);
 
-    // 🔥 Header แบบมินิมอล: แค่ปุ่มออก ไม่มี Progress bar ให้กดดัน
+    // 🔥 Header แบบมินิมอล
     root.appendChild(el('div', {
       class: 'session-top',
       style: 'display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;'
     }, [
       el('button', { class: 'icon-btn', text: '✕', onclick: function () { App.navigate('home'); } }),
       el('div', { class: 'small muted', style: 'font-weight:600;', text: 'โหมดทบทวน' }),
-      el('div', { style: 'width:48px;' }) // ดันให้ปุ่ม X อยู่ซ้าย และข้อความอยู่กลาง
+      el('div', { style: 'width:48px;' })
     ]));
 
     var q = cards[currentIndex];
@@ -359,7 +358,9 @@
       currentX = 0; currentY = 0;
     });
 
-    // 🔥 ปุ่มควบคุม: [ < ] [ สุ่มข้อ ] [ > ] (ใช้ class btn ปกติ ไม่ให้ลูกศรหาย)
+    // 🔥 ปุ่มควบคุมด้านล่าง: [ < ] [ สุ่มข้อ ] [ > หรือ Submit ]
+    var isLastCard = (currentIndex === cards.length - 1);
+
     root.appendChild(el('div', { class: 'row', style: 'margin-top:24px; justify-content:center; gap:16px;' }, [
       
       // ย้อนกลับ
@@ -368,7 +369,7 @@
         style: 'width:48px; height:48px; font-size:1.5rem;',
         text: '<',
         onclick: function () {
-          currentIndex = (currentIndex - 1 + cards.length) % cards.length; // วนลูป
+          currentIndex = (currentIndex - 1 + cards.length) % cards.length;
           flipped = false;
           renderCard(root);
         }
@@ -392,17 +393,23 @@
         }
       }),
 
-      // ไปข้างหน้า
-      el('button', { 
-        class: 'icon-btn', 
-        style: 'width:48px; height:48px; font-size:1.5rem;',
-        text: '>',
-        onclick: function () {
-          currentIndex = (currentIndex + 1) % cards.length; // วนลูป
-          flipped = false;
-          renderCard(root);
-        }
-      })
+      // ไปข้างหน้า / จบการทบทวน
+      isLastCard ? 
+        el('button', { 
+          class: 'btn btn-primary', style: 'min-width:120px;', text: 'จบการทบทวน',
+          onclick: function () { App.views.flashcards(root); }
+        })
+        :
+        el('button', { 
+          class: 'icon-btn', 
+          style: 'width:48px; height:48px; font-size:1.5rem;',
+          text: '>',
+          onclick: function () {
+            currentIndex = (currentIndex + 1) % cards.length;
+            flipped = false;
+            renderCard(root);
+          }
+        })
     ]));
   }
 
@@ -417,9 +424,8 @@
     inner.classList.add(direction === 'left' ? 'swipe-left' : 'swipe-right');
 
     setTimeout(function () {
-      // 🔥 ปัดซ้าย/ขวา = บันทึก Leitner (จำได้/จำไม่ได้)
       updateBox(q, direction === 'right');
- 
+      
       cards.splice(currentIndex, 1);
       
       if (cards.length === 0) {
@@ -429,7 +435,7 @@
       }
 
       if (currentIndex >= cards.length) {
-        currentIndex = 0; // วนกลับไปเริ่ม
+        currentIndex = 0;
       }
       
       flipped = false;

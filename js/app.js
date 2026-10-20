@@ -20,7 +20,7 @@
   }
 
   function render() {
-    // 🔥 ล้างตัวจับเวลาเก่าเสมอเมื่อเปลี่ยนหน้า (แก้บั๊กซ้อน)
+    // 🔥 ล้างตัวจับเวลาเก่าเสมอเมื่อเปลี่ยนหน้า
     if (window.App.views.session && window.App.views.session.clearTimer) {
       window.App.views.session.clearTimer();
     }
@@ -30,7 +30,6 @@
     var main = document.getElementById('main');
     if (!main) return;
     
-    // 🔥 ล้าง HTML เก่าให้เกลี้ยงก่อนวาดใหม่
     while (main.firstChild) {
       main.removeChild(main.firstChild);
     }
@@ -100,7 +99,6 @@
     return prefix + '-' + String(max + 1).padStart(3, '0');
   }
 
-  // ---------- Daily / topicRecent / causes ----------
   function recordDaily(q, confidence, correct, timeMs) {
     var daily = App.storage.getDaily();
     var today = App.scheduler.todayKey();
@@ -136,6 +134,70 @@
     App.storage.setCauses(causes);
   }
 
+  // 🔥 Hamburger Menu
+  function initMenu() {
+    var btn = document.getElementById('menu-toggle');
+    if (!btn) return;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay hidden';
+    overlay.style = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; display:flex; justify-content:flex-end;';
+    
+    var menu = document.createElement('div');
+    menu.className = 'card';
+    menu.style = 'width:280px; height:100%; margin:0; border-radius:0; display:flex; flex-direction:column; gap:16px; padding:24px; background:var(--surface);';
+    
+    menu.appendChild(el('h2', { text: 'ตั้งค่าด่วน' }));
+    
+    menu.appendChild(el('div', { class: 'field' }, [
+      el('span', { class: 'label', text: 'ภาษา (Language)' }),
+      (function(){
+        var sel = el('select', { class: 'select' });
+        sel.appendChild(el('option', { value: 'th', text: 'ไทย' }));
+        sel.appendChild(el('option', { value: 'en', text: 'English (เร็วๆ นี้)' }));
+        sel.disabled = true;
+        return sel;
+      })()
+    ]));
+
+    menu.appendChild(el('div', { class: 'field' }, [
+      el('span', { class: 'label', text: 'รูปแบบการตอบ' }),
+      (function(){
+        var sel = el('select', { class: 'select' });
+        sel.appendChild(el('option', { value: 'button', text: 'กดปุ่ม' }));
+        sel.appendChild(el('option', { value: 'scroll', text: 'เลื่อนลง (Scroll)' }));
+        
+        var saved = localStorage.getItem('answerMode') || 'button';
+        sel.value = saved;
+        
+        sel.addEventListener('change', function() {
+          localStorage.setItem('answerMode', sel.value);
+          App.toast('บันทึกการตั้งค่าแล้ว');
+          App.render();
+        });
+        return sel;
+      })()
+    ]));
+
+    menu.appendChild(el('button', { 
+      class: 'btn btn-primary', 
+      style: 'margin-top:auto;', 
+      text: 'ปิดเมนู', 
+      onclick: function() { overlay.classList.add('hidden'); }
+    }));
+
+    overlay.appendChild(menu);
+    document.body.appendChild(overlay);
+
+    btn.addEventListener('click', function() {
+      overlay.classList.remove('hidden');
+    });
+    
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) overlay.classList.add('hidden');
+    });
+  }
+
   function init() {
     if (!App.storage.isAvailable()) {
       var main = document.getElementById('main');
@@ -150,6 +212,9 @@
     }
     App.storage.migrateIfNeeded();
     App.theme.init();
+    
+    initMenu(); // เรียกใช้ Hamburger Menu
+
     window.addEventListener('hashchange', render);
     if (!window.location.hash) window.location.hash = '#/home';
     render();

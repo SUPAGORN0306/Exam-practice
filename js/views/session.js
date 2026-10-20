@@ -1,4 +1,4 @@
-/* Session view — Free Navigation (skip/back), continuous timer, per-question timing */
+/* Session view — Free Navigation (skip/back), continuous timer, per-question timing, scroll mode, submit */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -89,27 +89,16 @@
 
     var order = session.choiceOrders[q.id] || q.choices.map(function (_, i) { return i; });
     var existing = session.answers.find(function (a) { return a.qid === q.id && a.isRecheck === current.isRecheck; });
+    var isScrollMode = localStorage.getItem('answerMode') === 'scroll';
 
-    // --- Top bar with timer & arrows ---
+    // --- Top bar ---
     var isTimed = session.timer.mode === 'timed';
-    
-    // ตัวเลขเวลาซ้าย (จับเวลา) และ ขวา (เต็ม)
-    var elapsedEl = el('div', {
-      class: 'small',
-      style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;',
-      text: formatMs(sessionElapsedMs || session.timer.elapsedMs || 0)
-    });
-    
-    var totalEl = el('div', {
-      class: 'small muted',
-      style: 'font-variant-numeric: tabular-nums; white-space:nowrap;',
-      text: isTimed ? formatMs(session.timer.totalMs) : ''
-    });
+    var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs || session.timer.elapsedMs || 0) });
+    var totalEl = el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: isTimed ? formatMs(session.timer.totalMs) : '' });
 
-    // สร้าง container 2 บรรทัด
     var topContainer = el('div', { class: 'session-top', style: 'display:flex; flex-direction:column; gap:12px; margin-bottom:16px;' });
     
-    // แถวที่ 1: [X] [2/14] [00:34] [====Progress====] [00:60]
+    // Row 1: [X] [2/14] [00:34] [====Progress====] [00:60]
     var row1 = el('div', { style: 'display:flex; align-items:center; gap:10px; width:100%;' }, [
       el('button', { 
         class: 'icon-btn', 'aria-label': 'ออก', text: '✕', 
@@ -129,7 +118,8 @@
     ]);
     topContainer.appendChild(row1);
 
-    // แถวที่ 2: ปุ่มลูกศร ซ้าย-ขวา (อยู่ตรงกลาง)
+    // Row 2: [ < ] [ > หรือ Submit ]
+    var isLastQ = (session.index === session.n - 1);
     var row2 = el('div', { style: 'display:flex; justify-content:center; gap:16px; margin-top:4px;' }, [
       el('button', {
         class: 'icon-btn', 'aria-label': 'ย้อนกลับ', text: '<',
@@ -143,13 +133,14 @@
           }
         }
       }),
-      el('button', {
+      isLastQ ? el('button', {
+        class: 'btn btn-primary', text: 'ส่งคำตอบ', onclick: function() { finishSession(session); }
+      }) : el('button', {
         class: 'icon-btn', 'aria-label': 'ข้อถัดไป', text: '>',
         onclick: function () { goNext(session); }
       })
     ]);
     topContainer.appendChild(row2);
-
     root.appendChild(topContainer);
 
     // --- Timer tick ---
@@ -231,6 +222,16 @@
     card.appendChild(choicesWrap);
     root.appendChild(card);
     root.appendChild(bottomWrap);
+
+    // 🔥 Floating Submit Button for Scroll Mode
+    if (isLastQ && isScrollMode) {
+      root.appendChild(el('button', {
+        class: 'btn btn-primary',
+        style: 'position:fixed; bottom:80px; right:20px; z-index:99; box-shadow:var(--shadow-md); padding:12px 24px;',
+        text: 'ส่งคำตอบ',
+        onclick: function() { finishSession(session); }
+      }));
+    }
   }
 
   function commitAnswer(confidence, q, chosen, session) {

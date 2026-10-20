@@ -41,7 +41,12 @@
   <div id="app">
     <header class="app-header">
       <h1 class="app-title">Smart Practice</h1>
-      <button id="themeToggle" class="icon-btn" aria-label="สลับธีม">◐</button>
+      
+      <!-- 🔥 ปุ่ม Theme และ Hamburger Menu อยู่ติดกัน -->
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button id="themeToggle" class="icon-btn" aria-label="สลับธีม">◐</button>
+        <button id="menu-toggle" class="icon-btn" aria-label="เมนู">≡</button>
+      </div>
     </header>
 
     <main id="main" class="main" aria-live="polite"></main>
@@ -55,7 +60,6 @@
         <span class="nav-icon" aria-hidden="true">▤</span>
         <span class="nav-label">สถิติ</span>
       </a>
-      <!-- เพิ่มปุ่มแฟลชการ์ด (ใช้สัญลักษณ์ ▣ แทนอิโมจิ) -->
       <a href="#/flashcards" data-route="flashcards" class="nav-item">
         <span class="nav-icon" aria-hidden="true">▣</span>
         <span class="nav-label">แฟลชการ์ด</span>
