@@ -1,4 +1,4 @@
-/* Flashcards mode — swipeable cards, updates Leitner box */
+/* Flashcards mode — swipeable cards with subject/topic selection */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -20,20 +20,9 @@
     var el = App.el;
     var questions = App.loadQuestions();
     var progress = App.storage.getProgress();
-    
-    // Filter: pick due cards first, then others. Max 20.
-    var due = [];
-    var rest = [];
-    questions.forEach(function (q) {
-      var p = progress[q.id];
-      if (p && p.due && p.due <= App.scheduler.todayKey()) due.push(q);
-      else rest.push(q);
-    });
-    due = shuffle(due);
-    rest = shuffle(rest);
-    var selected = due.concat(rest).slice(0, 20);
+    var settings = App.storage.getSettings();
 
-    if (selected.length === 0) {
+    if (questions.length === 0) {
       root.appendChild(el('div', { class: 'empty' }, [
         el('p', { text: 'ยังไม่มีข้อสอบในระบบ' }),
         el('button', { class: 'btn btn-primary', text: 'กลับหน้าแรก', onclick: function () { App.navigate('home'); } })
@@ -41,19 +30,124 @@
       return;
     }
 
+    // --- Selection UI ---
+    var selectedSubject = null;
+    var selectedTopic = '';
+
+    root.appendChild(el('div', { class: 'card' }, [
+      el('h2', { text: 'ฝึกแฟลชการ์ด' }),
+      el('p', { class: 'muted small', text: 'เลือกวิชาและบทที่ต้องการทบทวน' }),
+      
+      // Subject Select
+      el('div', { class: 'field', style: 'margin-top:16px;' }, [
+        el('span', { class: 'label', text: 'วิชา' }),
+        (function() {
+          var sel = el('select', { class: 'select' });
+          sel.appendChild(el('option', { value: '', text: '-- ทุกวิชา --' }));
+          App.subjects.forEach(function (s) {
+            var count = questions.filter(function(q) { return q.subject === s.id; }).length;
+            if (count > 0) {
+              sel.appendChild(el('option', { value: s.id, text: s.name + ' (' + count + ' ข้อ)' }));
+            }
+          });
+          sel.addEventListener('change', function () {
+            selectedSubject = sel.value || null;
+            renderTopicSelect();
+          });
+          return sel;
+        })()
+      ]),
+
+      // Topic Select (Container)
+      el('div', { class: 'field', id: 'fc-topic-wrap' }, [
+        el('span', { class: 'label', text: 'บท (ไม่บังคับ)' }),
+        el('div', { id: 'fc-topic-container' }, [
+          el('select', { class: 'select', disabled: true }, [el('option', { text: 'เลือกวิชาก่อน' })])
+        ])
+      ]),
+
+      el('button', {
+        class: 'btn btn-primary btn-block',
+        style: 'margin-top:24px; font-size:1.05rem; min-height:56px;',
+        text: 'เริ่มฝึก',
+        onclick: function () {
+          startSession(root, selectedSubject, selectedTopic);
+        }
+      })
+    ]));
+
+    function renderTopicSelect() {
+      var container = document.getElementById('fc-topic-container');
+      if (!container) return;
+      while (container.firstChild) container.removeChild(container.firstChild);
+
+      var sel = el('select', { class: 'select' });
+      sel.appendChild(el('option', { value: '', text: 'ทุกบทในวิชานี้' }));
+      
+      var filtered = questions.filter(function(q) {
+        return !selectedSubject || q.subject === selectedSubject;
+      });
+      
+      var topics = {};
+      filtered.forEach(function(q) {
+        topics[q.topic] = (topics[q.topic] || 0) + 1;
+      });
+
+      Object.keys(topics).forEach(function(t) {
+        sel.appendChild(el('option', { value: t, text: t + ' (' + topics[t] + ' ข้อ)' }));
+      });
+
+      sel.addEventListener('change', function() {
+        selectedTopic = sel.value;
+      });
+
+      container.appendChild(sel);
+    }
+  };
+
+  function startSession(root, subjectId, topicName) {
+    var el = App.el;
+    var questions = App.loadQuestions();
+    var progress = App.storage.getProgress();
+
+    // Filter questions
+    var pool = questions.filter(function(q) {
+      if (subjectId && q.subject !== subjectId) return false;
+      if (topicName && q.topic !== topicName) return false;
+      return true;
+    });
+
+    if (pool.length === 0) {
+      App.toast('ไม่มีข้อสอบในหมวดหมู่นี้');
+      return;
+    }
+
+    // Split into due vs rest
+    var due = [];
+    var rest = [];
+    pool.forEach(function (q) {
+      var p = progress[q.id];
+      if (p && p.due && p.due <= App.scheduler.todayKey()) due.push(q);
+      else rest.push(q);
+    });
+
+    due = shuffle(due);
+    rest = shuffle(rest);
+    var selected = due.concat(rest).slice(0, 20);
+
     cards = selected;
     currentIndex = 0;
     flipped = false;
 
-    renderCard(root);
-  };
+    renderCard(root, subjectId, topicName);
+  }
 
-  function renderCard(root) {
+  function renderCard(root, subjectId, topicName) {
     var el = App.el;
     // Clear root
     while (root.firstChild) root.removeChild(root.firstChild);
 
-    // Top bar (จัด Layout ให้เหมือนหน้า Session)
+    // Top bar
     root.appendChild(el('div', { 
       class: 'session-top', 
       style: 'display:flex; align-items:center; gap:12px; margin-bottom:16px;' 
@@ -79,34 +173,33 @@
     if (currentIndex >= cards.length) {
       // Done
       root.appendChild(el('div', { class: 'card center' }, [
-        el('h2', { text: 'จบชุดแฟลชการ์ด 🎉' }),
+        el('h2', { text: 'จบชุดแฟลชการ์ด' }),
         el('p', { class: 'muted', text: 'ทบทวนครบ ' + cards.length + ' ใบแล้ว' }),
-        el('button', { class: 'btn btn-primary btn-block', style: 'margin-top:16px;', text: 'กลับหน้าแรก', onclick: function () { App.navigate('home'); } })
+        el('div', { class: 'row', style: 'justify-content:center; margin-top:16px;' }, [
+          el('button', { class: 'btn', text: 'เลือกหมวดใหม่', onclick: function () { App.views.flashcards(root); } }),
+          el('button', { class: 'btn btn-primary', text: 'กลับหน้าแรก', onclick: function () { App.navigate('home'); } })
+        ])
       ]));
       return;
     }
 
     var q = cards[currentIndex];
 
-    // Card container
     var card = el('div', { 
       class: 'card', 
       style: 'min-height: 350px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; cursor: pointer; transition: all 0.2s;' 
     });
     
     if (!flipped) {
-      // Front: Question
       card.appendChild(el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic }));
       card.appendChild(el('h2', { style: 'margin-top:16px; white-space:pre-wrap;', text: q.question }));
       card.appendChild(el('p', { class: 'muted', style: 'margin-top:32px; font-size:0.9rem;', text: 'แตะเพื่อดูเฉลย' }));
       
-      // ใช้การเช็ค Event ให้ชัวร์ว่ากดแค่บนการ์ด
       card.addEventListener('click', function () {
         flipped = true;
-        renderCard(root);
+        renderCard(root, subjectId, topicName);
       });
     } else {
-      // Back: Answer + Explanation
       card.appendChild(el('div', { class: 'small muted', text: 'เฉลย' }));
       var correctText = q.choices[q.answer];
       card.appendChild(el('h2', { style: 'margin-top:12px; color: var(--correct);', text: correctText }));
@@ -116,7 +209,6 @@
         el('p', { style: 'margin-top:8px; white-space:pre-wrap;', text: q.explanation })
       ]));
 
-      // Actions
       var actionRow = el('div', { class: 'row', style: 'margin-top:24px; width:100%;' }, [
         el('button', { 
           class: 'btn btn-danger', 
@@ -128,7 +220,7 @@
             updateBox(q, false);
             currentIndex++;
             flipped = false;
-            renderCard(root);
+            renderCard(root, subjectId, topicName);
           }
         }),
         el('button', { 
@@ -141,13 +233,12 @@
             updateBox(q, true);
             currentIndex++;
             flipped = false;
-            renderCard(root);
+            renderCard(root, subjectId, topicName);
           }
         })
       ]);
       card.appendChild(actionRow);
       
-      // ป้องกันการคลิกที่ปุ่มแล้วไปกระตุ้น event ของการ์ด
       card.addEventListener('click', function(e) {
         e.stopPropagation();
       });
