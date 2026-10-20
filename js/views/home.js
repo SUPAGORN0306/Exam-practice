@@ -1,4 +1,4 @@
-/* Home view — round 1: simple start session + resume banner + empty state */
+/* Home view — smart start + goal ring + streak + subject cards */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -6,98 +6,84 @@
   App.views.home = function (root) {
     var el = App.el;
     var questions = App.loadQuestions();
+    var progress = App.storage.getProgress();
     var settings = App.storage.getSettings();
     var active = App.storage.getActiveSession();
+    var today = App.scheduler.todayKey();
+    var daily = App.storage.getDaily();
 
-    // --- Resume banner ---
+    // ---------- Resume banner ----------
     if (active) {
-      var resumeCard = el('div', { class: 'card' }, [
-        el('h2', { text: 'ชุดที่ค้างอยู่' }),
-        el('p', {
-          class: 'muted small',
-          text:
-            'ตอบแล้ว ' +
-            (active.answers ? active.answers.length : 0) +
-            ' / ' +
-            active.n +
-            ' ข้อ'
-        }),
-        el('div', { class: 'row' }, [
-          el('button', {
-            class: 'btn btn-primary',
-            text: 'ทำต่อ',
-            onclick: function () { App.navigate('session'); }
-          }),
-          el('button', {
-            class: 'btn',
-            text: 'ทิ้งชุดนี้',
-            onclick: function () {
-              if (App.confirm('ต้องการทิ้งชุดนี้หรือไม่?')) {
-                App.storage.setActiveSession(null);
-                App.render();
+      root.appendChild(
+        el('div', { class: 'card' }, [
+          el('h2', { text: 'ชุดที่ค้างอยู่' }),
+          el('p', { class: 'muted small', text: 'ตอบแล้ว ' + (active.answers ? active.answers.length : 0) + ' / ' + active.n + ' ข้อ' }),
+          el('div', { class: 'row', style: 'margin-top:8px;' }, [
+            el('button', { class: 'btn btn-primary', text: 'ทำต่อ', onclick: function () { App.navigate('session'); App.render(); } }),
+            el('button', {
+              class: 'btn', text: 'ทิ้งชุดนี้',
+              onclick: function () {
+                if (App.confirm('ต้องการทิ้งชุดนี้หรือไม่?')) {
+                  App.storage.setActiveSession(null);
+                  App.render();
+                }
               }
-            }
-          })
+            })
+          ])
         ])
-      ]);
-      root.appendChild(resumeCard);
+      );
     }
 
-    // --- Empty state ---
+    // ---------- Empty state ----------
     if (questions.length === 0) {
-      var emptyCard = el('div', { class: 'card' }, [
-        el('h2', { text: 'ยินดีต้อนรับ' }),
-        el('p', {
-          class: 'muted',
-          text: 'ยังไม่มีข้อสอบในระบบ เริ่มได้ด้วยการโหลดตัวอย่าง เพิ่มเอง หรือนำเข้าไฟล์'
-        }),
-        el('div', { class: 'stack' }, [
-          el('button', {
-            class: 'btn btn-primary btn-block',
-            text: 'โหลดข้อสอบตัวอย่าง (20 ข้อ)',
-            onclick: function () {
-              var existing = App.loadQuestions();
-              var ids = {};
-              existing.forEach(function (q) { if (q.id) ids[q.id] = true; });
-              var added = 0;
-              App.sampleQuestions.forEach(function (q) {
-                if (q.id && ids[q.id]) return;
-                existing.push(q);
-                added++;
-              });
-              App.saveQuestions(existing);
-              App.toast('เพิ่มข้อสอบตัวอย่าง ' + added + ' ข้อ');
-              App.render();
-            }
-          }),
-          el('button', {
-            class: 'btn btn-block',
-            text: 'เพิ่มข้อสอบ',
-            onclick: function () {
-              window.location.hash = '#/manage?tab=form';
-            }
-          }),
-          el('button', {
-            class: 'btn btn-block',
-            text: 'นำเข้าจากไฟล์',
-            onclick: function () {
-              window.location.hash = '#/manage?tab=import';
-            }
-          })
+      root.appendChild(
+        el('div', { class: 'card' }, [
+          el('h2', { text: 'ยินดีต้อนรับ' }),
+          el('p', { class: 'muted', text: 'ยังไม่มีข้อสอบในระบบ เริ่มได้ด้วยการโหลดตัวอย่าง เพิ่มเอง หรือนำเข้าไฟล์' }),
+          el('div', { class: 'stack' }, [
+            el('button', {
+              class: 'btn btn-primary btn-block', text: 'โหลดข้อสอบตัวอย่าง (20 ข้อ)',
+              onclick: function () {
+                var existing = App.loadQuestions();
+                var ids = {};
+                existing.forEach(function (q) { if (q.id) ids[q.id] = true; });
+                var added = 0;
+                App.sampleQuestions.forEach(function (q) {
+                  if (q.id && ids[q.id]) return;
+                  existing.push(q); added++;
+                });
+                App.saveQuestions(existing);
+                App.toast('เพิ่มข้อสอบตัวอย่าง ' + added + ' ข้อ');
+                App.render();
+              }
+            }),
+            el('button', { class: 'btn btn-block', text: 'เพิ่มข้อสอบ', onclick: function () { window.location.hash = '#/manage?tab=form'; } }),
+            el('button', { class: 'btn btn-block', text: 'นำเข้าจากไฟล์', onclick: function () { window.location.hash = '#/manage?tab=import'; } })
+          ])
         ])
-      ]);
-      root.appendChild(emptyCard);
+      );
       return;
     }
 
-    // --- Quick start (simple shuffle in round 1) ---
-    var nOptions = [10, 20, 30];
+    // ---------- Big Start ----------
+    var dueCount = App.stats.dueTodayCount(questions, progress, today);
+    var statusText;
+    if (dueCount > 0) {
+      statusText = 'วันนี้มี ' + dueCount + ' ข้อที่ถึงเวลาทบทวน';
+    } else if (Object.keys(progress).length === 0) {
+      statusText = 'พร้อมเริ่มชุดแรกของคุณ';
+    } else {
+      statusText = 'ไม่มีข้อค้างทบทวน — ฝึกเพิ่มได้เลย';
+    }
+
+    var sizeOptions = [10, 20, 30];
     var chosenN = settings.defaultSessionSize || 20;
+    if (questions.length < chosenN) chosenN = Math.min(questions.length, 10) || 10;
     var sizeRow = el('div', { class: 'row' });
-    nOptions.forEach(function (n) {
+    sizeOptions.forEach(function (n) {
       var b = el('button', {
         class: 'chip' + (n === chosenN ? ' selected' : ''),
-        text: String(n) + ' ข้อ',
+        text: n + ' ข้อ',
         onclick: function () {
           chosenN = n;
           sizeRow.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('selected'); });
@@ -107,76 +93,199 @@
       sizeRow.appendChild(b);
     });
 
-    var startCard = el('div', { class: 'card' }, [
-      el('h2', { text: 'เริ่มฝึก' }),
-      el('p', { class: 'muted small', text: 'สุ่มข้อสอบจากทุกวิชา' }),
-      sizeRow,
-      el('button', {
-        class: 'btn btn-primary btn-block',
-        style: 'margin-top:12px;',
-        text: 'เริ่มฝึกเลย',
-        onclick: function () {
-          var picked = App.scheduler.buildSimpleSession(questions, { subject: null, topics: [] }, chosenN);
-          if (!picked.length) {
-            App.toast('ไม่มีข้อสอบให้ฝึก');
-            return;
+    root.appendChild(
+      el('div', { class: 'card' }, [
+        el('h2', { text: 'เริ่มฝึกวันนี้' }),
+        el('p', { class: 'muted small', text: statusText }),
+        el('div', { style: 'margin-top:12px;' }, [sizeRow]),
+        el('button', {
+          class: 'btn btn-primary btn-block',
+          style: 'margin-top:16px; font-size:1.05rem; min-height:56px;',
+          text: 'เริ่มฝึกวันนี้',
+          onclick: function () {
+            var result = App.scheduler.buildAutoSession({
+              questions: questions,
+              progress: progress,
+              topicRecent: App.storage.getTopicRecent(),
+              n: chosenN,
+              filter: { subject: null, topics: [] }
+            });
+            if (!result.ids.length) { App.toast('ไม่มีข้อสอบให้ฝึก'); return; }
+            App.views.session.startNew(result.ids, result.meta);
+            App.render();
           }
-          App.views.session.startNew(picked);
-        }
-      })
-    ]);
-    root.appendChild(startCard);
+        })
+      ])
+    );
 
-    // --- Subject cards (simple) ---
+    // ---------- Goal ring + streak ----------
+    var answeredToday = App.stats.dailyAnsweredCount(daily, today);
+    var goal = settings.dailyGoal || 20;
+    var pct = Math.min(1, goal ? answeredToday / goal : 0);
+    var streak = App.stats.streakDays(daily, today);
+
+    var ringR = 34, ringC = 2 * Math.PI * ringR;
+    var ring = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    ring.setAttribute('viewBox', '0 0 80 80');
+    ring.setAttribute('width', '80');
+    ring.setAttribute('height', '80');
+    var bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    bgCircle.setAttribute('cx', '40'); bgCircle.setAttribute('cy', '40');
+    bgCircle.setAttribute('r', String(ringR));
+    bgCircle.setAttribute('fill', 'none');
+    bgCircle.setAttribute('stroke', 'var(--border)');
+    bgCircle.setAttribute('stroke-width', '8');
+    ring.appendChild(bgCircle);
+    var fgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    fgCircle.setAttribute('cx', '40'); fgCircle.setAttribute('cy', '40');
+    fgCircle.setAttribute('r', String(ringR));
+    fgCircle.setAttribute('fill', 'none');
+    fgCircle.setAttribute('stroke', 'var(--primary)');
+    fgCircle.setAttribute('stroke-width', '8');
+    fgCircle.setAttribute('stroke-linecap', 'round');
+    fgCircle.setAttribute('stroke-dasharray', String(ringC));
+    fgCircle.setAttribute('stroke-dashoffset', String(ringC * (1 - pct)));
+    fgCircle.setAttribute('transform', 'rotate(-90 40 40)');
+    ring.appendChild(fgCircle);
+
+    var ringLabel = el('div', { style: 'text-align:center; font-weight:700; margin-top:4px;', text: answeredToday + ' / ' + goal });
+
+    root.appendChild(
+      el('div', { class: 'card' }, [
+        el('h3', { text: 'เป้าหมายรายวัน' }),
+        el('div', { class: 'row', style: 'align-items:center; gap:16px; margin-top:8px;' }, [
+          el('div', null, [ring, ringLabel]),
+          el('div', null, [
+            el('p', { class: 'muted small', style: 'margin:0;', text: 'ตอบไปแล้ววันนี้ ' + answeredToday + ' ข้อ' }),
+            el('p', { class: 'small', style: 'margin:6px 0 0; font-weight:600;', text: '🔥 สตรีค ' + streak + ' วันติดกัน' })
+          ])
+        ])
+      ])
+    );
+
+    // ---------- Subject cards ----------
     var subjectSection = el('div', { class: 'stack' });
-    subjectSection.appendChild(el('div', { class: 'section-title', text: 'เลือกตามวิชา' }));
+    subjectSection.appendChild(el('div', { class: 'section-title', text: 'วิชา' }));
     App.subjects.forEach(function (s) {
-      var count = questions.filter(function (q) { return q.subject === s.id; }).length;
-      if (count === 0) return;
+      var m = App.stats.subjectMastery(questions, progress, s.id);
+      if (m.total === 0) return;
+      var sDue = App.stats.dueTodayCount(questions, progress, today, { subject: s.id });
+      var pctText = Math.round(m.pct * 100) + '%';
+      var bar = el('div', { class: 'progress-bar', style: 'margin-top:6px;' }, [
+        el('div', { class: 'fill', style: 'width:' + pctText })
+      ]);
       subjectSection.appendChild(
         el('div', { class: 'card' }, [
           el('div', { class: 'row-between' }, [
-            el('div', null, [
+            el('div', { style: 'flex:1; min-width:0;' }, [
               el('h3', { text: s.name }),
-              el('div', { class: 'muted small', text: count + ' ข้อ' })
+              el('div', { class: 'muted small', text: 'จำได้แล้ว ' + pctText + ' (' + m.mastered + ' / ' + m.total + ' ข้อ)' }),
+              bar,
+              el('div', { class: 'muted small', style: 'margin-top:6px;', text: 'ค้างทบทวน ' + sDue + ' ข้อ' })
             ]),
             el('button', {
-              class: 'btn btn-primary',
-              text: 'เริ่ม',
-              onclick: function () {
-                var picked = App.scheduler.buildSimpleSession(questions, { subject: s.id, topics: [] }, chosenN);
-                if (!picked.length) {
-                  App.toast('ไม่มีข้อสอบในวิชานี้');
-                  return;
-                }
-                App.views.session.startNew(picked);
-              }
+              class: 'btn btn-primary', text: 'ฝึก',
+              onclick: function () { openSubjectSheet(s, questions, progress, chosenN); }
             })
           ])
         ])
       );
     });
-    if (subjectSection.children.length > 1) root.appendChild(subjectSection);
+    root.appendChild(subjectSection);
 
-    // --- Review mistakes (basic) ---
-    var wrongList = questions.filter(function (q) {
-      var p = App.storage.getProgress()[q.id];
-      return p && p.attempts > 0 && p.correct < p.attempts;
-    });
-    if (wrongList.length > 0) {
+    // ---------- Review wrong ----------
+    var wrongCount = questions.filter(function (q) {
+      var p = progress[q.id];
+      return p && (p.lapses || 0) > 0 && (p.box || 0) <= 2;
+    }).length;
+    if (wrongCount > 0) {
       root.appendChild(
         el('div', { class: 'card' }, [
           el('h3', { text: 'ทบทวนข้อที่เคยผิด' }),
-          el('p', { class: 'muted small', text: 'มี ' + wrongList.length + ' ข้อ' }),
+          el('p', { class: 'muted small', text: 'มี ' + wrongCount + ' ข้อที่ยังไม่แม่น' }),
           el('button', {
-            class: 'btn btn-block',
-            text: 'ทบทวนข้อที่เคยผิด',
+            class: 'btn btn-block', text: 'ทบทวนข้อที่เคยผิด',
             onclick: function () {
-              App.views.session.startNew(App.scheduler.shuffleArray(wrongList));
+              var res = App.scheduler.buildReviewWrongSession({
+                questions: questions, progress: progress, n: chosenN,
+                filter: { subject: null, topics: [] }
+              });
+              if (!res.ids.length) { App.toast('ไม่มีข้อที่ต้องทบทวน'); return; }
+              App.views.session.startNew(res.ids, res.meta);
+              App.render();
             }
           })
         ])
       );
     }
   };
+
+  // --- Bottom sheet for subject ---
+  function openSubjectSheet(subject, questions, progress, chosenN) {
+    var el = App.el;
+    var topics = {};
+    questions.forEach(function (q) {
+      if (q.subject === subject.id) topics[q.topic] = (topics[q.topic] || 0) + 1;
+    });
+    var selectedTopic = '';
+    var n = chosenN;
+
+    var overlay = el('div', {
+      style: 'position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:50;',
+      onclick: function (e) { if (e.target === overlay) document.body.removeChild(overlay); }
+    });
+    var sheet = el('div', {
+      style: 'position:fixed; left:0; right:0; bottom:0; background:var(--surface); border-radius:20px 20px 0 0; padding:20px; z-index:51; max-height:80vh; overflow-y:auto;'
+    });
+
+    sheet.appendChild(el('h2', { text: 'ฝึก ' + subject.name }));
+    sheet.appendChild(el('p', { class: 'muted small', text: 'เลือกบท (ไม่บังคับ)' }));
+
+    var topicSelect = el('select', { class: 'select' });
+    topicSelect.appendChild(el('option', { value: '', text: 'ทุกบท' }));
+    Object.keys(topics).forEach(function (t) {
+      var opt = el('option', { value: t, text: t + ' (' + topics[t] + ' ข้อ)' });
+      topicSelect.appendChild(opt);
+    });
+    topicSelect.addEventListener('change', function () { selectedTopic = topicSelect.value; });
+    sheet.appendChild(el('div', { class: 'field' }, [topicSelect]));
+
+    var nRow = el('div', { class: 'row' });
+    [10, 20, 30].forEach(function (val) {
+      var b = el('button', {
+        class: 'chip' + (val === n ? ' selected' : ''), text: val + ' ข้อ',
+        onclick: function () {
+          n = val;
+          nRow.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('selected'); });
+          b.classList.add('selected');
+        }
+      });
+      nRow.appendChild(b);
+    });
+    sheet.appendChild(el('p', { class: 'muted small', text: 'จำนวนข้อ' }));
+    sheet.appendChild(nRow);
+
+    sheet.appendChild(
+      el('button', {
+        class: 'btn btn-primary btn-block', style: 'margin-top:16px;',
+        text: 'เริ่มฝึกวิชานี้',
+        onclick: function () {
+          var res = App.scheduler.buildAutoSession({
+            questions: questions,
+            progress: progress,
+            topicRecent: App.storage.getTopicRecent(),
+            n: n,
+            filter: { subject: subject.id, topics: selectedTopic ? [selectedTopic] : [] }
+          });
+          if (!res.ids.length) { App.toast('ไม่มีข้อในเงื่อนไขนี้'); return; }
+          document.body.removeChild(overlay);
+          App.views.session.startNew(res.ids, res.meta);
+          App.render();
+        }
+      })
+    );
+
+    overlay.appendChild(sheet);
+    document.body.appendChild(overlay);
+  }
 })();

@@ -1,58 +1,153 @@
-/* Round 1 basic scheduler tests (Node) */
+/* Round 2 scheduler tests — Node */
 const assert = require('assert');
-const fs = require('fs');
 const path = require('path');
 
-// Minimal DOM-free environment for load
 global.window = global;
 global.App = {};
-// Load subjects
 require(path.join(__dirname, '..', 'data', 'subjects.js'));
-// Load scheduler
 require(path.join(__dirname, '..', 'js', 'scheduler.js'));
-
 const { App } = global;
+const S = App.scheduler;
 
-// --- buildSimpleSession respects n and filter ---
-const qs = [
-  { id: 'de-1', subject: 'data-engineering', topic: 't1', question: 'q', choices: ['a','b'], answer: 0, explanation: 'e' },
-  { id: 'de-2', subject: 'data-engineering', topic: 't2', question: 'q', choices: ['a','b'], answer: 0, explanation: 'e' },
-  { id: 'mi-1', subject: 'marketing-innovation', topic: 't1', question: 'q', choices: ['a','b'], answer: 0, explanation: 'e' }
-];
+// ---- nextBox ----
+(function testBoxRules() {
+  var p = S.nextBox({ box: 0 }, 'correctSure', new Date(2025, 0, 15, 10).getTime());
+  assert.strictEqual(p.box, 1);
+  assert.strictEqual(p.due, S.addDays('2025-01-15', 1));
 
-const picked = App.scheduler.buildSimpleSession(qs, { subject: null, topics: [] }, 2);
-assert.strictEqual(picked.length, 2, 'returns N when pool >= N');
+  var p2 = S.nextBox({ box: 5 }, 'correctSure', new Date(2025, 0, 15, 10).getTime());
+  assert.strictEqual(p2.box, 5);
+  assert.strictEqual(p2.due, S.addDays('2025-01-15', 30));
 
-const pickedFilter = App.scheduler.buildSimpleSession(qs, { subject: 'data-engineering', topics: [] }, 10);
-assert.strictEqual(pickedFilter.length, 2, 'filters by subject');
-assert.ok(pickedFilter.every(q => q.subject === 'data-engineering'));
+  var p3 = S.nextBox({ box: 3 }, 'correctGuess', new Date(2025, 0, 15, 10).getTime());
+  assert.strictEqual(p3.box, 1);
 
-const pickedTopics = App.scheduler.buildSimpleSession(qs, { subject: null, topics: ['t2'] }, 10);
-assert.strictEqual(pickedTopics.length, 1, 'filters by topic');
+  var p4 = S.nextBox({ box: 2, lapses: 1 }, 'wrong', new Date(2025, 0, 15, 10).getTime());
+  assert.strictEqual(p4.box, 0);
+  assert.strictEqual(p4.due, '2025-01-15');
+  assert.strictEqual(p4.lapses, 2);
 
-// --- shuffleChoices returns permutation ---
-const perm = App.scheduler.shuffleChoices(4);
-assert.strictEqual(perm.length, 4);
-const sorted = perm.slice().sort((a, b) => a - b);
-assert.deepStrictEqual(sorted, [0, 1, 2, 3], 'shuffleChoices is a permutation');
+  var p5 = S.nextBox({ box: 2 }, 'wrongSure', new Date(2025, 0, 15, 10).getTime());
+  assert.strictEqual(p5.box, 0);
+})();
 
-// --- todayKey local time minus 4h ---
-require(path.join(__dirname, '..', 'js', 'stats.js'));
-const origNow = Date.now;
-try {
-  // 2025-01-15 03:59 local
-  const t1 = new Date(2025, 0, 15, 3, 59, 0).getTime();
-  // 2025-01-15 04:00 local
-  const t2 = new Date(2025, 0, 15, 4, 0, 0).getTime();
-  Date.now = () => t1;
-  const k1 = App.stats.todayKey();
-  Date.now = () => t2;
-  const k2 = App.stats.todayKey();
-  assert.notStrictEqual(k1, k2, 'todayKey changes at 04:00 local');
-  assert.strictEqual(k1, '2025-01-14');
-  assert.strictEqual(k2, '2025-01-15');
-} finally {
-  Date.now = origNow;
-}
+// ---- todayKey boundary 03:59 vs 04:00 ----
+(function testTodayKey() {
+  var t1 = new Date(2025, 0, 15, 3, 59, 0).getTime();
+  var t2 = new Date(2025, 0, 15, 4, 0, 0).getTime();
+  assert.strictEqual(S.todayKey(t1), '2025-01-14');
+  assert.strictEqual(S.todayKey(t2), '2025-01-15');
+})();
 
-console.log('Round 1 tests passed.');
+// ---- buildAutoSession: due before new ----
+(function testDueBeforeNew() {
+  var qs = [];
+  for (var i = 0; i < 30; i++) {
+    qs.push({ id: 'q' + i, subject: i % 2 ? 'data-engineering' : 'marketing-innovation', topic: 't' + (i % 3) });
+  }
+  var progress = {};
+  [0, 1, 2, 3, 4].forEach(function (i) {
+    progress['q' + i] = { box: 1, due: '2025-01-10', attempts: 1, correct: 0, lapses: 1, lastAt: Date.now() };
+  });
+  var res = S.buildAutoSession({
+    questions: qs, progress: progress, topicRecent: {},
+    n: 10, filter: { subject: null, topics: [] },
+    now: new Date(2025, 0, 15, 10).getTime(),
+    rng: function () { return 0.5; }
+  });
+  assert.strictEqual(res.ids.length, 10, 'gets N');
+  var firstFive = res.ids.slice(0, 5);
+  firstFive.forEach(function (qid) {
+    assert.ok(qid.match(/^q[0-4]$/), 'first 5 are due: ' + qid);
+  });
+  assert.strictEqual(new Set(res.ids).size, res.ids.length);
+})();
+
+// ---- New questions capped at 60% ----
+(function testNewCap() {
+  var qs = [];
+  for (var i = 0; i < 50; i++) qs.push({ id: 'q' + i, subject: 'data-engineering', topic: 't' + (i % 5) });
+  var progress = {};
+  for (var j = 0; j < 30; j++) {
+    progress['q' + j] = { box: 2, due: '2030-01-01', attempts: 1, correct: 1, lapses: 0, lastAt: Date.now() };
+  }
+  var res = S.buildAutoSession({
+    questions: qs, progress: progress, topicRecent: {},
+    n: 10, filter: { subject: null, topics: [] },
+    now: new Date(2025, 0, 15, 10).getTime(),
+    rng: function () { return 0.5; }
+  });
+  
+  var newCount = res.ids.filter(function (id) {
+    var num = parseInt(id.replace('q', ''), 10);
+    return num >= 30;
+  }).length;
+  
+  assert.ok(newCount <= 6, 'new questions capped at 60% (got ' + newCount + ')');
+})();
+
+// ---- Library smaller than N ----
+(function testSmallLibrary() {
+  var qs = [{ id: 'a', subject: 'data-engineering', topic: 't' }];
+  var res = S.buildAutoSession({
+    questions: qs, progress: {}, topicRecent: {},
+    n: 20, filter: { subject: null, topics: [] },
+    now: Date.now(), rng: Math.random
+  });
+  assert.strictEqual(res.ids.length, 1);
+})();
+
+// ---- Weak topic sampled more often (statistical) ----
+(function testWeakTopicWeighted() {
+  var qs = [];
+  for (var i = 0; i < 10; i++) qs.push({ id: 'weak-' + i, subject: 'data-engineering', topic: 'weak' });
+  for (var j = 0; j < 10; j++) qs.push({ id: 'strong-' + j, subject: 'data-engineering', topic: 'strong' });
+  
+  var progress = {};
+  // strong: mastered, not due
+  for (var k = 0; k < 10; k++) {
+    progress['strong-' + k] = { box: 4, due: '2030-01-01', attempts: 5, correct: 5, lapses: 0, lastAt: Date.now() };
+  }
+  // weak: have been done (so not "new"), but lapses >= 2, not due
+  for (var w = 0; w < 10; w++) {
+    progress['weak-' + w] = { box: 1, due: '2030-01-01', attempts: 3, correct: 1, lapses: 2, lastAt: Date.now() };
+  }
+
+  var topicRecent = {
+    'data-engineering|weak': [0.2, 0.3, 0.1, 0.2, 0.3],
+    'data-engineering|strong': [0.95, 1.0, 0.9, 0.95, 1.0]
+  };
+  var weakPicks = 0, strongPicks = 0;
+  for (var trial = 0; trial < 2000; trial++) {
+    var res = S.buildAutoSession({
+      questions: qs, progress: progress, topicRecent: topicRecent,
+      n: 1, filter: { subject: null, topics: [] },
+      now: new Date(2025, 0, 15, 10).getTime(),
+      rng: Math.random
+    });
+    if (res.ids[0] && res.ids[0].indexOf('weak-') === 0) weakPicks++;
+    else strongPicks++;
+  }
+  assert.ok(weakPicks > strongPicks, 'weak picked more (' + weakPicks + ' vs ' + strongPicks + ')');
+})();
+
+// ---- injectRecheck returns new array; inserts at offset 3..5 ----
+(function testInjectRecheck() {
+  var queue = [{ qid: 'a' }, { qid: 'b' }, { qid: 'c' }, { qid: 'd' }, { qid: 'e' }, { qid: 'f' }, { qid: 'g' }];
+  var out = S.injectRecheck(queue, 'a', 0, function () { return 0; });
+  assert.strictEqual(out.length, queue.length + 1);
+  assert.strictEqual(out[3].qid, 'a');
+  assert.strictEqual(out[3].isRecheck, true);
+  assert.strictEqual(queue.length, 7, 'original queue unchanged');
+})();
+
+// ---- classifyAnswer ----
+(function testClassify() {
+  assert.strictEqual(S.classifyAnswer(true, 'sure'), 'correctSure');
+  assert.strictEqual(S.classifyAnswer(true, 'unsure'), 'correctUnsure');
+  assert.strictEqual(S.classifyAnswer(true, 'guess'), 'correctGuess');
+  assert.strictEqual(S.classifyAnswer(false, 'sure'), 'wrongSure');
+  assert.strictEqual(S.classifyAnswer(false, 'guess'), 'wrong');
+})();
+
+console.log('Round 2 tests passed.');

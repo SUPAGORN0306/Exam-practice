@@ -1,4 +1,4 @@
-/* App bootstrap + hash router + small shared UI helpers */
+/* App bootstrap + hash router + helpers */
 (function () {
   window.App = window.App || {};
 
@@ -24,13 +24,11 @@
     setActiveNav(r.name);
     var main = document.getElementById('main');
     if (!main) return;
-    // Clear with textContent-safe approach
     while (main.firstChild) main.removeChild(main.firstChild);
     var fn = App.views && App.views[r.name];
     if (typeof fn === 'function') {
-      try {
-        fn(main, r.query);
-      } catch (e) {
+      try { fn(main, r.query); }
+      catch (e) {
         console.error(e);
         var p = document.createElement('p');
         p.className = 'empty';
@@ -40,11 +38,8 @@
     }
   }
 
-  function navigate(name) {
-    window.location.hash = '#/' + name;
-  }
+  function navigate(name) { window.location.hash = '#/' + name; }
 
-  // --- Shared UI helpers ---
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     if (attrs) {
@@ -52,10 +47,9 @@
         var v = attrs[k];
         if (k === 'text') node.textContent = v;
         else if (k === 'class') node.className = v;
-        else if (k.indexOf('on') === 0 && typeof v === 'function') {
-          node.addEventListener(k.slice(2).toLowerCase(), v);
-        } else if (v === true) node.setAttribute(k, '');
-        else if (v === false || v == null) { /* skip */ }
+        else if (k.indexOf('on') === 0 && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+        else if (v === true) node.setAttribute(k, '');
+        else if (v === false || v == null) {}
         else node.setAttribute(k, v);
       });
     }
@@ -70,25 +64,18 @@
   var toastTimer = null;
   function toast(msg) {
     var t = document.querySelector('.toast');
-    if (!t) {
-      t = el('div', { class: 'toast' });
-      document.body.appendChild(t);
-    }
+    if (!t) { t = el('div', { class: 'toast' }); document.body.appendChild(t); }
     t.textContent = msg;
     t.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1800);
   }
 
-  function confirmAction(msg) {
-    return window.confirm(msg);
-  }
+  function confirmAction(msg) { return window.confirm(msg); }
 
-  // --- Data helpers (round 1 minimal) ---
   function loadQuestions() { return App.storage.getQuestions(); }
   function saveQuestions(list) { return App.storage.setQuestions(list); }
 
-  // Generate next id for a subject, e.g. de-006
   function nextIdFor(subject, existingList) {
     var prefix = App.subjectPrefix(subject);
     var max = 0;
@@ -100,19 +87,43 @@
         if (n > max) max = n;
       }
     });
-    var next = max + 1;
-    return prefix + '-' + String(next).padStart(3, '0');
+    return prefix + '-' + String(max + 1).padStart(3, '0');
   }
 
-  // Save progress counter minimally (attempts / correct / lastAt)
-  function recordAnswerBasics(qid, correct) {
-    var progress = App.storage.getProgress();
-    var p = progress[qid] || { attempts: 0, correct: 0 };
-    p.attempts = (p.attempts || 0) + 1;
-    if (correct) p.correct = (p.correct || 0) + 1;
-    p.lastAt = Date.now();
-    progress[qid] = p;
-    App.storage.setProgress(progress);
+  // ---------- Daily / topicRecent / causes ----------
+  function recordDaily(q, confidence, correct, timeMs) {
+    var daily = App.storage.getDaily();
+    var today = App.scheduler.todayKey();
+    daily[today] = daily[today] || {};
+    daily[today][q.subject] = daily[today][q.subject] || {};
+    daily[today][q.subject][q.topic] = daily[today][q.subject][q.topic] || {
+      n: 0, sure: 0, unsure: 0, guess: 0, wrong: 0, wrongSure: 0, ms: 0
+    };
+    var cell = daily[today][q.subject][q.topic];
+    cell.n++;
+    cell[confidence] = (cell[confidence] || 0) + 1;
+    if (!correct) {
+      cell.wrong++;
+      if (confidence === 'sure') cell.wrongSure++;
+    }
+    cell.ms += (timeMs || 0);
+    App.storage.setDaily(daily);
+  }
+
+  function recordTopicScore(q, type) {
+    var recent = App.storage.getTopicRecent();
+    var key = App.scheduler.topicKey(q.subject, q.topic);
+    recent[key] = recent[key] || [];
+    recent[key].push(App.scheduler.scoreForType(type));
+    if (recent[key].length > 20) recent[key] = recent[key].slice(-20);
+    App.storage.setTopicRecent(recent);
+  }
+
+  function recordCause(subject, cause) {
+    var causes = App.storage.getCauses();
+    causes[subject] = causes[subject] || { noKnowledge: 0, misread: 0, confused: 0 };
+    causes[subject][cause] = (causes[subject][cause] || 0) + 1;
+    App.storage.setCauses(causes);
   }
 
   function init() {
@@ -120,14 +131,10 @@
       var main = document.getElementById('main');
       if (main) {
         while (main.firstChild) main.removeChild(main.firstChild);
-        var box = el('div', { class: 'card' }, [
+        main.appendChild(el('div', { class: 'card' }, [
           el('h2', { text: 'ไม่สามารถใช้งานพื้นที่จัดเก็บได้' }),
-          el('p', {
-            class: 'muted',
-            text: 'เบราว์เซอร์นี้บล็อก localStorage กรุณาเปิดในโหมดปกติหรืออนุญาตการจัดเก็บข้อมูล'
-          })
-        ]);
-        main.appendChild(box);
+          el('p', { class: 'muted', text: 'เบราว์เซอร์นี้บล็อก localStorage กรุณาเปิดในโหมดปกติหรืออนุญาตการจัดเก็บข้อมูล' })
+        ]));
       }
       return;
     }
@@ -146,13 +153,14 @@
   App.loadQuestions = loadQuestions;
   App.saveQuestions = saveQuestions;
   App.nextIdFor = nextIdFor;
-  App.recordAnswerBasics = recordAnswerBasics;
+
+  App.recordDaily = recordDaily;
+  App.recordTopicScore = recordTopicScore;
+  App.recordCause = recordCause;
+
   App.render = render;
   App.views = App.views || {};
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();
