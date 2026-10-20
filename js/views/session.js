@@ -67,6 +67,8 @@
   }
 
   function renderSession(root) {
+    clearTimer(); // ล้างตัวจับเวลาเก่าเสมอเมื่อวาดหน้าจอใหม่
+    
     var el = App.el;
     var session = App.storage.getActiveSession();
     if (!session) {
@@ -89,14 +91,18 @@
     var order = session.choiceOrders[q.id] || q.choices.map(function (_, i) { return i; });
     var existing = session.answers.find(function (a) { return a.qid === q.id && !a.isRecheck; });
 
-    // --- Top bar with timer ---
+    // --- Top bar with timer (ปรับให้ชัดเจน) ---
+    var isTimed = session.timer.mode === 'timed';
+    var timeLabel = isTimed && !overtimeStarted ? 'เหลือ: ' : 'เวลา: ';
+    
     var timerEl = el('div', {
-      class: 'small muted',
-      style: 'font-variant-numeric: tabular-nums; min-width:60px; text-align:right;',
-      text: formatMs(sessionElapsedMs || session.timer.elapsedMs || 0)
+      class: 'small',
+      style: 'font-variant-numeric: tabular-nums; min-width:75px; text-align:center; background:var(--bg); padding:4px 8px; border-radius:8px; font-weight:600; color:var(--primary);',
+      text: timeLabel + formatMs(sessionElapsedMs || session.timer.elapsedMs || 0)
     });
+    
     var pct = Math.round((session.index / session.n) * 100);
-    root.appendChild(el('div', { class: 'session-top' }, [
+    root.appendChild(el('div', { class: 'session-top', style: 'flex-wrap: nowrap; gap: 8px;' }, [
       el('button', { class: 'icon-btn', 'aria-label': 'ออก', text: '✕', onclick: function () {
         if (App.confirm('ความคืบหน้าจะถูกเก็บไว้ ต้องการออกหรือไม่?')) {
           clearTimer();
@@ -105,13 +111,12 @@
           App.navigate('home');
         }
       }}),
-      el('div', { class: 'small muted', text: (session.index + 1) + ' / ' + session.n }),
+      el('div', { class: 'small muted', style: 'white-space:nowrap;', text: (session.index + 1) + ' / ' + session.n }),
       timerEl,
-      el('div', { class: 'progress-bar' }, [el('div', { class: 'fill', style: 'width:' + pct + '%' })])
+      el('div', { class: 'progress-bar', style: 'flex:1;' }, [el('div', { class: 'fill', style: 'width:' + pct + '%' })])
     ]));
 
     // --- Timer tick ---
-    clearTimer();
     var questionStart = Date.now();
     var answerCommitAt = null;
     timerInterval = setInterval(function () {
@@ -124,15 +129,14 @@
       var remainOrElapsed = session.timer.mode === 'timed' && !overtimeStarted
         ? (session.timer.totalMs - sessionElapsedMs)
         : sessionElapsedMs;
-      timerEl.textContent = formatMs(Math.max(0, remainOrElapsed));
+      var label = session.timer.mode === 'timed' && !overtimeStarted ? 'เหลือ: ' : 'เวลา: ';
+      timerEl.textContent = label + formatMs(Math.max(0, remainOrElapsed));
     }, 1000);
 
     document.addEventListener('visibilitychange', handleVisibility);
     function handleVisibility() {
       if (document.hidden) { hiddenAt = Date.now(); }
-      else if (hiddenAt) {
-        hiddenAt = null;
-      }
+      else if (hiddenAt) { hiddenAt = null; }
     }
 
     // --- Question card ---

@@ -1,4 +1,4 @@
-/* Settings view — round 4: theme, shuffle, timer, goal, AI key, danger zone */
+/* Settings view — round 4: theme, shuffle, timer, goal, AI key, data management */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -84,7 +84,7 @@
     ]));
 
     // ==========================================
-    // 2. AI Settings
+    // 2. AI Settings (Round 4)
     // ==========================================
     var apiKey = App.askai.getApiKey();
     var keyInput = el('input', { class: 'input', type: 'password', placeholder: 'วาง API Key ที่นี่' });
@@ -146,7 +146,7 @@
     ]));
 
     // ==========================================
-    // 4. Danger Zone
+    // 4. Data Management (formerly Danger Zone)
     // ==========================================
     var resetBtn = el('button', { class: 'btn btn-danger', text: 'รีเซ็ตความคืบหน้า (เก็บข้อสอบไว้)', onclick: function () {
       var t = window.prompt('พิมพ์ "ยืนยัน" เพื่อยืนยัน');
@@ -169,7 +169,7 @@
     }});
 
     root.appendChild(el('div', { class: 'card' }, [
-      el('h3', { text: 'เขตอันตราย' }),
+      el('h3', { text: 'จัดการข้อมูล' }), // <--- เปลี่ยนหัวข้อตรงนี้
       el('div', { class: 'stack' }, [resetBtn, wipeBtn])
     ]));
 
