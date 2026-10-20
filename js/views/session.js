@@ -152,7 +152,7 @@
   }
 
   // ==========================================
-  // 🔥 ฟังก์ชันสร้าง Grid Navigator (ใช้ร่วมกันทั้ง 2 โหมด)
+  // 🔥 ฟังก์ชันสร้าง Grid Navigator (แบบกรอบสี)
   // ==========================================
   function openGridNavigator(session, onSelect) {
     var el = App.el;
@@ -172,16 +172,15 @@
     // Legend
     panel.appendChild(el('div', { class: 'row', style: 'gap:12px; margin-bottom:12px; font-size:0.75rem;' }, [
       el('div', { class: 'row', style: 'gap:4px;' }, [
-        el('div', { style: 'width:12px; height:12px; background:var(--correct); border-radius:3px;' }),
+        el('div', { style: 'width:14px; height:14px; background:rgba(30,127,79,0.1); border:2px solid var(--correct); border-radius:3px;' }),
         el('span', { class: 'muted', text: 'ตอบแล้ว' })
       ]),
       el('div', { class: 'row', style: 'gap:4px;' }, [
-        el('div', { style: 'width:12px; height:12px; background:var(--wrong); border-radius:3px;' }),
+        el('div', { style: 'width:14px; height:14px; background:rgba(192,57,43,0.1); border:2px solid var(--wrong); border-radius:3px;' }),
         el('span', { class: 'muted', text: 'ยังไม่ได้ตอบ' })
       ])
     ]));
 
-    // Grid
     var grid = el('div', { style: 'display:grid; grid-template-columns: repeat(5, 1fr); gap:6px;' });
     
     session.queue.forEach(function (cur, idx) {
@@ -190,13 +189,19 @@
       });
       var isCurrent = (session.index === idx);
       
+      // 🔥 สีกรอบ (ไม่ทึบ)
+      var bgColor = answered ? 'rgba(30,127,79,0.1)' : 'rgba(192,57,43,0.1)';
+      var borderColor = answered ? 'var(--correct)' : 'var(--wrong)';
+      var textColor = answered ? 'var(--correct)' : 'var(--wrong)';
+      
       var cell = el('button', {
         type: 'button',
-        style: 'width:40px; height:40px; border-radius:8px; border:none; font-weight:700; font-size:0.85rem; cursor:pointer; ' +
-               'background: ' + (answered ? 'var(--correct)' : 'var(--wrong)') + '; ' +
-               'color: white; ' +
-               'outline: ' + (isCurrent ? '3px solid var(--primary)' : 'none') + '; ' +
-               'outline-offset: 2px;',
+        style: 'width:40px; height:40px; border-radius:8px; ' +
+               'background:' + bgColor + '; ' +
+               'border:2px solid ' + borderColor + '; ' +
+               'color:' + textColor + '; ' +
+               'font-weight:700; font-size:0.85rem; cursor:pointer; ' +
+               (isCurrent ? 'outline:2px solid var(--primary); outline-offset:2px;' : ''),
         text: String(idx + 1),
         onclick: function () {
           closeGrid();
