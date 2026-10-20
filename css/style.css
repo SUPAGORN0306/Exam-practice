@@ -357,7 +357,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   perspective: 1000px;
   margin-top: 12px;
   position: relative;
-  touch-action: none !important; /* 🔥 บังคับให้ swipe แนวนอนทำงานบนมือถือ */
   user-select: none;
   -webkit-user-select: none;
 }
@@ -576,7 +575,7 @@ html[data-theme='dark'] .choice-btn.wrong {
 
 /* 4. ลบสไตล์ของโหมด Scroll ทิ้ง (ถ้าคุณรู้สึกว่ามันดูทื่อเกินไป) 
    หรือถ้าอยากให้โหมด Scroll ยังมีกรอบเหมือนเดิม ให้คอมเมนต์โค้ดด้านล่างนี้ */
-/*
+
 .choice-btn.scroll-mode {
   border: 1px solid var(--border) !important;
   background: var(--surface) !important;
@@ -584,14 +583,14 @@ html[data-theme='dark'] .choice-btn.wrong {
   margin-bottom: 12px !important;
 }
 
-/* .flashcard-scene, 
+.flashcard-scene, 
 .flashcard-inner,
 .flashcard-front, 
 .flashcard-back {
   touch-action: pan-y !important; 
   -webkit-user-select: none; 
   user-select: none;
-} */
+}
 
 /* ซ่อน scrollbar ของการ์ดเพื่อไม่ให้มันแย่งพื้นที่ */
 .flashcard-front::-webkit-scrollbar, 
