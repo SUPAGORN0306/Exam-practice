@@ -39,8 +39,7 @@
     if (s) { s.timer.elapsedMs = sessionElapsedMs; App.storage.setActiveSession(s); }
   }
 
-  // 🔥 ปรับ startTick ให้รับ callback อัปเดตหลอด Progress ตามเวลา
-  function startTick(session, elapsedEl, onTick) {
+  function startTick(session, elapsedEl) {
     clearTimer();
     timerInterval = setInterval(function () {
       if (hiddenAt) return;
@@ -50,7 +49,6 @@
         showOvertimeModal(session);
       }
       if (elapsedEl) elapsedEl.textContent = formatMs(sessionElapsedMs);
-      if (onTick) onTick();
       if (sessionElapsedMs - lastSaveMs >= 5000) { lastSaveMs = sessionElapsedMs; saveElapsed(); }
     }, 1000);
   }
@@ -138,11 +136,11 @@
   }
 
   // ==========================================
-  // 🔥 โหมด Scroll (หลอด Progress เป็นเวลา)
+  // 🔥 โหมด Scroll
   // ==========================================
   function renderScrollMode(root, session) {
     var el = App.el;
-    var s = App.storage.getActiveSession();
+    var s = App.storage.getActiveSession(); // 🔥 ดึงข้อมูลล่าสุดเสมอ
 
     var isTimed = s.timer.mode === 'timed';
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs) });
@@ -203,10 +201,12 @@
           onclick: function () {
             if (revealedAlready) return; 
 
+            // 🔥 อัปเดตสีปุ่มเฉพาะข้อนี้ (ไม่ต้อง render ใหม่)
             choicesWrap.querySelectorAll('.choice-btn').forEach(function (b, i) {
               b.classList.toggle('selected', order[i] === origIdx);
             });
 
+            // 🔥 บันทึกลง Storage
             var activeS = App.storage.getActiveSession();
             var cq = activeS.queue[idx];
             var tempExisting = activeS.answers.find(function (a) { return a.qid === q.id && String(a.isRecheck) === String(cq.isRecheck); });
@@ -217,6 +217,9 @@
             }
             activeS.timer.elapsedMs = sessionElapsedMs;
             App.storage.setActiveSession(activeS);
+
+            // 🔥 อัปเดต existing ใน Local (เพื่อให้ปุ่มที่กดรอบหน้าจำได้)
+            existing = { qid: q.id, chosen: origIdx, confidence: null, isRecheck: cq.isRecheck, correct: null };
           }
         });
         btn.appendChild(el('span', { class: 'choice-tag', text: LETTERS[displayIdx] }));
@@ -290,10 +293,12 @@
   }
 
   // ==========================================
-  // 🔥 โหมด Button (หลอด Progress เป็นเวลา)
+  // 🔥 โหมด Button
   // ==========================================
   function renderButtonMode(root, session) {
     var el = App.el;
+    
+    // 🔥 ดึงข้อมูลล่าสุดจาก Storage เสมอ
     var s = App.storage.getActiveSession();
     var current = s.queue[s.index];
     if (!current) { finishSession(s); return; }
@@ -576,7 +581,6 @@
       wrap.appendChild(chipRow);
     }
 
-    // 🔥 AI Row: ปุ่มซ้ายคัดลอก+เด้ง, ปุ่มขวาคงเดิม
     var aiRow = el('div', { class: 'row', style: 'flex-wrap:wrap; margin-top:16px;' }, [
       el('button', { 
         class: 'btn', 
