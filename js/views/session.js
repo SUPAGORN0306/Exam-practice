@@ -1,4 +1,4 @@
-/* Session view — Free Navigation, continuous timer, scroll mode (long page), submit */
+/* Session view — Free Navigation, continuous timer, unified UI, submit */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -12,7 +12,6 @@
   var questionStartMs = 0;       
   var lastSaveMs = 0;
 
-  // ลงทะเบียน visibilitychange ครั้งเดียวทั้งแอป ไม่สะสมตอน render ซ้ำ
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { hiddenAt = Date.now(); }
     else { hiddenAt = null; }
@@ -26,7 +25,6 @@
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   }
 
-  // โหลดเวลาเดิมกลับมาเมื่อ resume ชุดที่ค้างไว้
   function syncTimerWithSession(session) {
     if (currentSessionId !== session.id) {
       currentSessionId = session.id;
@@ -50,13 +48,11 @@
         overtimeStarted = true;
         showOvertimeModal(session);
       }
-      elapsedEl.textContent = formatMs(sessionElapsedMs);
-      // เซฟเวลาทุก 5 วินาที กันปิดแท็บแล้วเวลาหาย
+      if (elapsedEl) elapsedEl.textContent = formatMs(sessionElapsedMs);
       if (sessionElapsedMs - lastSaveMs >= 5000) { lastSaveMs = sessionElapsedMs; saveElapsed(); }
     }, 1000);
   }
 
-  // 🔥 ฟังก์ชันเช็กข้อที่ยังไม่ได้ตอบ (ใช้ร่วมกันทั้ง 2 โหมด)
   function getUnansweredCount(session) {
     return session.queue.filter(function (cur) {
       return !session.answers.some(function (a) { 
@@ -140,7 +136,7 @@
   }
 
   // ==========================================
-  // โหมด Scroll (Long Page)
+  // 🔥 โหมด Scroll (แก้ UI และ Timer ให้เหมือนโหมดปกติ)
   // ==========================================
   function renderScrollMode(root, session) {
     var el = App.el;
@@ -148,6 +144,12 @@
     var isTimed = session.timer.mode === 'timed';
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs) });
     var totalEl = el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: isTimed ? formatMs(session.timer.totalMs) : '' });
+
+    // คำนวณ Progress Bar จากจำนวนข้อที่ตอบแล้ว
+    var answeredCount = session.queue.filter(function (cur) {
+      return session.answers.some(function (a) { return a.qid === cur.qid && String(a.isRecheck) === String(cur.isRecheck) && a.chosen != null; });
+    }).length;
+    var pct = Math.round((answeredCount / session.queue.length) * 100);
 
     var topContainer = el('div', { class: 'session-top', style: 'display:flex; align-items:center; gap:10px; margin-bottom:16px; width:100%;' }, [
       el('button', {
@@ -160,9 +162,9 @@
           }
         }
       }),
-      el('div', { class: 'small muted', style: 'white-space:nowrap;', text: 'โหมดกระดาษคำตอบ' }),
-      el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [el('div', { class: 'fill', style: 'width:100%' })]),
+      el('div', { class: 'small muted', style: 'white-space:nowrap;', text: 'กระดาษคำตอบ' }),
       elapsedEl,
+      el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [el('div', { class: 'fill', style: 'width:' + pct + '%' })]),
       totalEl
     ]);
     root.appendChild(topContainer);
@@ -190,8 +192,9 @@
       var choicesWrap = el('div', { style: 'margin-top:12px;' });
 
       order.forEach(function (origIdx, displayIdx) {
+        // 🔥 ใช้คลาส choice-btn ปกติ (ไม่ใส่ scroll-mode) เพื่อให้มีขอบกรอบเหมือนโหมดปกติ
         var btn = el('button', {
-          class: 'choice-btn scroll-mode' + (existing && existing.chosen === origIdx ? ' selected' : ''),
+          class: 'choice-btn' + (existing && existing.chosen === origIdx ? ' selected' : ''),
           type: 'button',
           onclick: function () {
             if (revealedAlready) return; 
@@ -210,6 +213,13 @@
             }
             s.timer.elapsedMs = sessionElapsedMs;
             App.storage.setActiveSession(s);
+
+            // อัปเดตหลอด Progress Bar แบบทันที
+            var newAnswered = s.queue.filter(function (cur) {
+              return s.answers.some(function (a) { return a.qid === cur.qid && String(a.isRecheck) === String(cur.isRecheck) && a.chosen != null; });
+            }).length;
+            var barFill = topContainer.querySelector('.progress-bar .fill');
+            if (barFill) barFill.style.width = Math.round((newAnswered / s.queue.length) * 100) + '%';
           }
         });
         btn.appendChild(el('span', { class: 'choice-tag', text: LETTERS[displayIdx] }));
@@ -283,7 +293,7 @@
   }
 
   // ==========================================
-  // โหมด Button (ทีละข้อ)
+  // 🔥 โหมด Button (แก้บั๊กการจำสีคำตอบ)
   // ==========================================
   function renderButtonMode(root, session) {
     var el = App.el;
@@ -298,7 +308,10 @@
     }
 
     var order = session.choiceOrders[q.id] || q.choices.map(function (_, i) { return i; });
-    var existing = session.answers.find(function (a) {
+    
+    // 🔥 สำคัญมาก: ต้องดึงข้อมูลจาก Session ใน Storage มาอัปเดต เพื่อให้เจอคำตอบที่เพิ่งกดล่าสุด
+    var s = App.storage.getActiveSession();
+    var existing = s.answers.find(function (a) {
       return a.qid === q.id && String(a.isRecheck) === String(current.isRecheck);
     });
 
@@ -338,23 +351,23 @@
 
     order.forEach(function (origIdx, displayIdx) {
       var btn = el('button', {
-        class: 'choice-btn',
+        class: 'choice-btn' + (chosen === origIdx ? ' selected' : ''),
         type: 'button',
         disabled: revealed,
         onclick: function () {
           if (revealed) return;
           chosen = origIdx;
 
-          var s = App.storage.getActiveSession();
-          var cq = s.queue[s.index];
-          var tempExisting = s.answers.find(function (a) { return a.qid === q.id && String(a.isRecheck) === String(cq.isRecheck); });
+          var activeS = App.storage.getActiveSession();
+          var cq = activeS.queue[activeS.index];
+          var tempExisting = activeS.answers.find(function (a) { return a.qid === q.id && String(a.isRecheck) === String(cq.isRecheck); });
 
           if (!tempExisting) {
-            s.answers.push({ qid: q.id, chosen: chosen, confidence: null, isRecheck: cq.isRecheck, correct: null });
+            activeS.answers.push({ qid: q.id, chosen: chosen, confidence: null, isRecheck: cq.isRecheck, correct: null });
           } else {
             tempExisting.chosen = chosen;
           }
-          App.storage.setActiveSession(s);
+          App.storage.setActiveSession(activeS);
 
           choicesWrap.querySelectorAll('.choice-btn').forEach(function (b, i) {
             b.classList.toggle('selected', order[i] === chosen);
@@ -368,8 +381,6 @@
       if (revealed) {
         if (origIdx === q.answer) btn.classList.add('correct');
         if (origIdx === chosen && chosen !== q.answer) btn.classList.add('wrong');
-      } else if (chosen === origIdx) {
-        btn.classList.add('selected');
       }
       choicesWrap.appendChild(btn);
     });
@@ -425,7 +436,6 @@
           style: 'height:56px; padding: 0 24px;', 
           text: 'ส่งคำตอบ', 
           onclick: function () { 
-            // 🔥 เพิ่มการเตือนข้อที่ยังไม่ได้ตอบในโหมดปกติ
             var unanswered = getUnansweredCount(session);
             var msg = unanswered > 0
               ? 'ยังไม่ได้ตอบ ' + unanswered + ' ข้อ ต้องการส่งคำตอบเลยหรือไม่?'

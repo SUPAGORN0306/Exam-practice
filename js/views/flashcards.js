@@ -222,7 +222,7 @@
   };
 
   function startSession(root) {
-    // 🔥 ล้างหน้าจอ Setup ก่อนวาดการ์ด
+    // 🔥 ล้างหน้าจอ Setup ออกให้เกลี้ยง
     while (root.firstChild) root.removeChild(root.firstChild);
 
     var questions = App.loadQuestions();
@@ -270,7 +270,22 @@
 
   function renderCard(root) {
     var el = App.el;
+    // 🔥 ล้างหน้าจอให้เกลี้ยง
     while (root.firstChild) root.removeChild(root.firstChild);
+
+    // 🔥 ถ้าไม่มีข้อสอบเหลือ (ปัดครบแล้ว) ให้แสดงหน้าจอจบการทบทวน
+    if (cards.length === 0) {
+      root.appendChild(el('div', { class: 'card center', style: 'padding: 40px 20px;' }, [
+        el('h2', { text: 'ทบทวนครบทุกใบแล้ว' }),
+        el('p', { class: 'muted', text: 'คุณปัดการ์ดครบ ' + totalCardsCount + ' ใบเรียบร้อยแล้ว' }),
+        el('p', { class: 'small muted', text: 'เข้าใจแล้ว: ' + understoodCount + ' ใบ' }),
+        el('div', { class: 'row', style: 'justify-content:center; margin-top:24px;' }, [
+          el('button', { class: 'btn', text: 'กลับหน้าเลือกวิชา', onclick: function () { App.views.flashcards(root); } }),
+          el('button', { class: 'btn btn-primary', text: 'กลับหน้าแรก', onclick: function () { App.navigate('home'); } })
+        ])
+      ]));
+      return;
+    }
 
     // Header: ปุ่มออก + ตัวเลขสถิติ
     root.appendChild(el('div', {
@@ -281,9 +296,6 @@
       el('div', { class: 'small muted', style: 'font-weight:600; font-variant-numeric: tabular-nums; font-size:1.1rem;', text: understoodCount + ' / ' + totalCardsCount }),
       el('div', { style: 'width:48px;' })
     ]));
-
-    // 🔥 กัน Error กรณีที่กองว่างแล้วแต่ยัง render
-    if (!cards[currentIndex]) return;
 
     var q = cards[currentIndex];
 
@@ -367,7 +379,7 @@
       currentX = 0; currentY = 0;
     }
 
-    // 🔥 ปุ่ม < > และ สุ่มข้อ จะทำงานในกรอบของ cards.length (กองที่ยังไม่ปัด)
+    // ปุ่มควบคุมด้านล่าง: [ < ] [ สุ่มข้อ ] [ > ]
     root.appendChild(el('div', { class: 'row', style: 'margin-top:24px; justify-content:center; gap:16px;' }, [
       
       // ย้อนกลับ
@@ -382,7 +394,7 @@
         }
       }),
 
-      // สุ่มข้อ (วนเฉพาะในกองที่ยังไม่ปัด)
+      // สุ่มข้อ
       el('button', { 
         class: 'btn',
         style: 'min-width:100px;',
@@ -431,13 +443,12 @@
         understoodCount++;
       }
       
-      // เอาการ์ดออกจากกอง (ไม่ว่าจะปัดซ้ายหรือขวา ก็หลุดจากกอง)
+      // 🔥 เอาการ์ดออกจากกอง
       cards.splice(currentIndex, 1);
       
-      // ถ้าไม่มีข้อสอบเหลือแล้ว (ปัดครบทุกใบ) ค่อยกลับไปหน้าหลัก
+      // 🔥 ถ้าไม่มีข้อสอบเหลือแล้ว ให้ renderCard จัดการหน้าจอจบให้เอง (ไม่ต้องเด้งกลับ Setup)
       if (cards.length === 0) {
-        App.toast('ทบทวนครบทุกใบแล้ว');
-        App.views.flashcards(root);
+        renderCard(root);
         return;
       }
 
