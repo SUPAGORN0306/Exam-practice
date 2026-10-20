@@ -3,13 +3,13 @@
   window.App = window.App || {};
   App.views = App.views || {};
 
-  var cards = [];            // การ์ดที่ยังไม่ได้ปัดขวา (ที่เหลืออยู่ในกอง)
+  var cards = [];            
   var totalCardsCount = 0;
-  var understoodCount = 0;   // จำนวนที่ปัดขวา (เข้าใจแล้ว)
+  var understoodCount = 0;   
   var currentIndex = 0;
   var flipped = false;
-  var animating = false;     // ล็อกระหว่างอนิเมชันปัด
-  var scored = {};           // qid -> true ถ้าบันทึกสถานะรอบนี้ไปแล้ว (นับแค่ครั้งแรกที่ปัด)
+  var animating = false;     
+  var scored = {};           
 
   var selection = {
     subjectId: null,
@@ -184,7 +184,6 @@
 
       var totalAvailable = getPool().length;
       
-      // 🔥 สร้างตัวเลือกจากจำนวนข้อที่มีจริง
       var options = [];
       var presets = [10, 20, 30, 45, 60, 80, 90];
       
@@ -297,7 +296,6 @@
     var el = App.el;
     while (root.firstChild) root.removeChild(root.firstChild);
 
-    // 🔥 แก้ไข: จบชุดเมื่อ understoodCount ครบ (ปัดขวาครบทุกใบ)
     if (understoodCount >= totalCardsCount) {
       root.appendChild(el('div', { class: 'card center', style: 'padding: 40px 20px;' }, [
         el('h2', { text: 'ทบทวนครบทุกใบแล้ว' }),
@@ -353,82 +351,139 @@
     scene.appendChild(inner);
     root.appendChild(scene);
 
-    var tracking = false;       
-    var dragged = false;        
-    var suppressClick = false;
     var startX = 0, startY = 0, currentX = 0, currentY = 0;
-    var swipeThreshold = 40;
-    var dragSlop = 8;
+    var isSwiping = false;
+    var threshold = 40;
 
+    // 🔥 Tap to flip (click event)
     inner.addEventListener('click', function () {
-      if (suppressClick || animating) return; 
+      if (animating || isSwiping) return;
       flipped = !flipped;
       inner.classList.toggle('is-flipped', flipped);
     });
 
-    scene.addEventListener('pointerdown', function (e) {
+    // 🔥 Touch Events (สำหรับมือถือ)
+    scene.addEventListener('touchstart', function (e) {
       if (animating) return;
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-
-      tracking = true;
-      dragged = false;
-      startX = e.clientX;
-      startY = e.clientY;
+      var touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
       currentX = 0;
       currentY = 0;
+      isSwiping = false;
+      inner.style.transition = 'none';
+    }, { passive: true });
 
-      // 🔥 setPointerCapture ทำให้ลากได้ลื่น ไม่หลุดขอบ (สำคัญมากสำหรับมือถือ)
-      scene.setPointerCapture(e.pointerId);
-    });
+    scene.addEventListener('touchmove', function (e) {
+      if (animating) return;
+      var touch = e.touches[0];
+      currentX = touch.clientX - startX;
+      currentY = touch.clientY - startY;
 
-    scene.addEventListener('pointermove', function (e) {
-      if (!tracking) return;
-      currentX = e.clientX - startX;
-      currentY = e.clientY - startY;
-
-      if (!dragged) {
-        if (Math.abs(currentX) > dragSlop && Math.abs(currentX) > Math.abs(currentY)) {
-          dragged = true;
-          inner.style.transition = 'none';
+      // ตรวจสอบว่าเป็นการลากแนวนอนหรือไม่
+      if (!isSwiping) {
+        if (Math.abs(currentX) > 8 && Math.abs(currentX) > Math.abs(currentY)) {
+          isSwiping = true;
         } else {
           return;
         }
       }
+
+      // 🔥 ป้องกันไม่ให้หน้าจอ scroll ตอนลากแนวนอน
+      if (e.cancelable) e.preventDefault();
+
       var rotate = currentX * 0.05;
       inner.style.transform = 'translateX(' + currentX + 'px) rotate(' + rotate + 'deg)';
-    });
+    }, { passive: false });
 
-    scene.addEventListener('pointerup', function (e) {
-      if (!tracking) return;
-      tracking = false;
-
-      if (dragged) {
-        suppressClick = true;
-        setTimeout(function () { suppressClick = false; }, 0);
+    scene.addEventListener('touchend', function () {
+      if (animating) return;
+      if (!isSwiping) {
+        // ไม่ใช่การปัด = ถือว่า tap (ให้ click handler จัดการ)
+        inner.style.transition = '';
+        inner.style.transform = '';
+        return;
       }
 
-      var shouldSwipe = !dragged ? null
-                      : currentX < -swipeThreshold ? 'left'
-                      : currentX > swipeThreshold  ? 'right'
-                      : null;
-
-      if (shouldSwipe) {
-        animateSwipe(shouldSwipe, q, root, inner);
+      if (currentX < -threshold) {
+        animateSwipe('left', q, root, inner);
+      } else if (currentX > threshold) {
+        animateSwipe('right', q, root, inner);
       } else {
         inner.style.transition = '';
         inner.style.transform = '';
       }
-      currentX = 0; currentY = 0;
-      dragged = false;
+      isSwiping = false;
+      currentX = 0;
+      currentY = 0;
     });
 
-    scene.addEventListener('pointercancel', function () {
-      if (!tracking) return;
-      tracking = false;
+    scene.addEventListener('touchcancel', function () {
       inner.style.transition = '';
       inner.style.transform = '';
-      currentX = 0; currentY = 0;
-      dragged = false;
+      isSwiping = false;
+      currentX = 0;
+      currentY = 0;
+    });
+
+    // 🔥 Mouse Events (สำหรับคอมพิวเตอร์)
+    var mouseDown = false;
+    scene.addEventListener('mousedown', function (e) {
+      if (animating) return;
+      e.preventDefault();
+      mouseDown = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      currentX = 0;
+      currentY = 0;
+      isSwiping = false;
+      inner.style.transition = 'none';
+    });
+
+    scene.addEventListener('mousemove', function (e) {
+      if (!mouseDown || animating) return;
+      currentX = e.clientX - startX;
+      currentY = e.clientY - startY;
+
+      if (!isSwiping) {
+        if (Math.abs(currentX) > 8 && Math.abs(currentX) > Math.abs(currentY)) {
+          isSwiping = true;
+        } else {
+          return;
+        }
+      }
+
+      var rotate = currentX * 0.05;
+      inner.style.transform = 'translateX(' + currentX + 'px) rotate(' + rotate + 'deg)';
+    });
+
+    scene.addEventListener('mouseup', function () {
+      if (!mouseDown) return;
+      mouseDown = false;
+
+      if (isSwiping) {
+        if (currentX < -threshold) {
+          animateSwipe('left', q, root, inner);
+        } else if (currentX > threshold) {
+          animateSwipe('right', q, root, inner);
+        } else {
+          inner.style.transition = '';
+          inner.style.transform = '';
+        }
+      }
+      isSwiping = false;
+      currentX = 0;
+      currentY = 0;
+    });
+
+    scene.addEventListener('mouseleave', function () {
+      if (!mouseDown) return;
+      mouseDown = false;
+      inner.style.transition = '';
+      inner.style.transform = '';
+      isSwiping = false;
+      currentX = 0;
+      currentY = 0;
     });
 
     // ปุ่มควบคุมด้านล่าง
