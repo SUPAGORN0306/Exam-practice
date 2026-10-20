@@ -152,13 +152,9 @@
   }
 
   // ==========================================
-  // 🔥 ฟังก์ชันสร้าง Grid Navigator (ดึงข้อมูลสดๆ)
+  // 🔥 ฟังก์ชันสร้าง Grid Navigator (แบบกรอบสี)
   // ==========================================
-  function openGridNavigator(onSelect) {
-    // 🔥 ดึงข้อมูลสดๆ จาก Storage ทันที
-    var session = App.storage.getActiveSession();
-    if (!session) return;
-
+  function openGridNavigator(session, onSelect) {
     var el = App.el;
     var overlay = el('div', {
       style: 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:60; display:flex; align-items:flex-end; justify-content:flex-start;',
@@ -173,7 +169,6 @@
 
     panel.appendChild(el('h4', { style: 'margin: 0 0 12px; font-size: 0.95rem;', text: 'ผังข้อสอบ' }));
     
-    // Legend
     panel.appendChild(el('div', { class: 'row', style: 'gap:12px; margin-bottom:12px; font-size:0.75rem;' }, [
       el('div', { class: 'row', style: 'gap:4px;' }, [
         el('div', { style: 'width:14px; height:14px; background:rgba(30,127,79,0.1); border:2px solid var(--correct); border-radius:3px;' }),
@@ -308,6 +303,8 @@
             activeS.timer.elapsedMs = sessionElapsedMs;
             App.storage.setActiveSession(activeS);
 
+            // 🔥 อัปเดต session ในหน่วยความจำด้วย (ให้ผังเห็นค่าล่าสุด)
+            s = activeS;
             existing = { qid: q.id, chosen: origIdx, confidence: null, isRecheck: cq.isRecheck, correct: null };
 
             answeredCounterEl.textContent = countAnswered(activeS) + ' / ' + activeS.queue.length;
@@ -392,10 +389,12 @@
       'aria-label': 'เปิดผังข้อสอบ',
       text: '▦',
       onclick: function () {
-        openGridNavigator(function (idx) {
+        // 🔥 ดึง session ล่าสุดจาก storage (เพราะ s ในหน่วยความจำอาจจะอัปเดตแล้ว)
+        openGridNavigator(App.storage.getActiveSession(), function (idx) {
           var targetCard = document.getElementById('q-card-' + idx);
           if (targetCard) {
-            targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // 🔥 block: 'center' ทำให้โจทย์อยู่กลางจอ
+            targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
         });
       }
@@ -584,7 +583,7 @@
       'aria-label': 'เปิดผังข้อสอบ',
       text: '▦',
       onclick: function () {
-        openGridNavigator(function (idx) {
+        openGridNavigator(App.storage.getActiveSession(), function (idx) {
           var activeS = App.storage.getActiveSession();
           activeS.index = idx;
           activeS.timer.elapsedMs = sessionElapsedMs;
