@@ -39,7 +39,7 @@
     if (s) { s.timer.elapsedMs = sessionElapsedMs; App.storage.setActiveSession(s); }
   }
 
-  function startTick(session, elapsedEl) {
+  function startTick(session, elapsedEl, onTick) {
     clearTimer();
     timerInterval = setInterval(function () {
       if (hiddenAt) return;
@@ -49,6 +49,7 @@
         showOvertimeModal(session);
       }
       if (elapsedEl) elapsedEl.textContent = formatMs(sessionElapsedMs);
+      if (onTick) onTick();
       if (sessionElapsedMs - lastSaveMs >= 5000) { lastSaveMs = sessionElapsedMs; saveElapsed(); }
     }, 1000);
   }
@@ -144,11 +145,13 @@
 
     var isTimed = s.timer.mode === 'timed';
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs) });
-    var totalEl = el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: isTimed ? formatMs(s.timer.totalMs) : '' });
-
+    
+    // 🔥 สร้างหลอดและเวลารวมเฉพาะตอน timed
     var progressFill = el('div', { class: 'fill', style: 'width:0%' });
+    var progressBarEl = isTimed ? el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [progressFill]) : null;
+    var totalEl = isTimed ? el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: formatMs(s.timer.totalMs) }) : null;
 
-    var topContainer = el('div', { class: 'session-top', style: 'display:flex; align-items:center; gap:10px; margin-bottom:16px; width:100%;' }, [
+    var topChildren = [
       el('button', {
         class: 'icon-btn', 'aria-label': 'ออก', text: '✕',
         onclick: function () {
@@ -160,18 +163,19 @@
         }
       }),
       el('div', { class: 'small muted', style: 'white-space:nowrap;', text: 'กระดาษคำตอบ' }),
-      elapsedEl,
-      el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [progressFill]),
-      totalEl
-    ]);
+      elapsedEl
+    ];
+    if (progressBarEl) topChildren.push(progressBarEl);
+    if (totalEl) topChildren.push(totalEl);
+
+    var topContainer = el('div', { class: 'session-top', style: 'display:flex; align-items:center; gap:10px; margin-bottom:16px; width:100%;' }, topChildren);
     root.appendChild(topContainer);
 
     startTick(session, elapsedEl, function() {
-      var pct = 100;
       if (isTimed && s.timer.totalMs > 0) {
-        pct = Math.min(100, Math.round((sessionElapsedMs / s.timer.totalMs) * 100));
+        var pct = Math.min(100, Math.round((sessionElapsedMs / s.timer.totalMs) * 100));
+        progressFill.style.width = pct + '%';
       }
-      progressFill.style.width = pct + '%';
     });
 
     s.queue.forEach(function (current, idx) {
@@ -201,12 +205,10 @@
           onclick: function () {
             if (revealedAlready) return; 
 
-            // 🔥 อัปเดตสีปุ่มเฉพาะข้อนี้ (ไม่ต้อง render ใหม่)
             choicesWrap.querySelectorAll('.choice-btn').forEach(function (b, i) {
               b.classList.toggle('selected', order[i] === origIdx);
             });
 
-            // 🔥 บันทึกลง Storage
             var activeS = App.storage.getActiveSession();
             var cq = activeS.queue[idx];
             var tempExisting = activeS.answers.find(function (a) { return a.qid === q.id && String(a.isRecheck) === String(cq.isRecheck); });
@@ -218,7 +220,7 @@
             activeS.timer.elapsedMs = sessionElapsedMs;
             App.storage.setActiveSession(activeS);
 
-            // 🔥 อัปเดต existing ใน Local (เพื่อให้ปุ่มที่กดรอบหน้าจำได้)
+            // 🔥 อัปเดต existing ใน Local
             existing = { qid: q.id, chosen: origIdx, confidence: null, isRecheck: cq.isRecheck, correct: null };
           }
         });
@@ -317,11 +319,13 @@
 
     var isTimed = s.timer.mode === 'timed';
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs) });
-    var totalEl = el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: isTimed ? formatMs(s.timer.totalMs) : '' });
-
+    
+    // 🔥 สร้างหลอดและเวลารวมเฉพาะตอน timed
     var progressFill = el('div', { class: 'fill', style: 'width:0%' });
+    var progressBarEl = isTimed ? el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [progressFill]) : null;
+    var totalEl = isTimed ? el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: formatMs(s.timer.totalMs) }) : null;
 
-    var topContainer = el('div', { class: 'session-top', style: 'display:flex; align-items:center; gap:10px; margin-bottom:16px; width:100%;' }, [
+    var topChildren = [
       el('button', {
         class: 'icon-btn', 'aria-label': 'ออก', text: '✕',
         onclick: function () {
@@ -333,19 +337,19 @@
         }
       }),
       el('div', { class: 'small muted', style: 'white-space:nowrap;', text: (s.index + 1) + ' / ' + s.queue.length }),
-      elapsedEl,
-      el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [progressFill]),
-      totalEl
-    ]);
+      elapsedEl
+    ];
+    if (progressBarEl) topChildren.push(progressBarEl);
+    if (totalEl) topChildren.push(totalEl);
+
+    var topContainer = el('div', { class: 'session-top', style: 'display:flex; align-items:center; gap:10px; margin-bottom:16px; width:100%;' }, topChildren);
     root.appendChild(topContainer);
 
-    // 🔥 หลอด Progress ของโหมด Button ใช้เวลาจริง
     startTick(s, elapsedEl, function() {
-      var pct = 100;
       if (isTimed && s.timer.totalMs > 0) {
-        pct = Math.min(100, Math.round((sessionElapsedMs / s.timer.totalMs) * 100));
+        var pct = Math.min(100, Math.round((sessionElapsedMs / s.timer.totalMs) * 100));
+        progressFill.style.width = pct + '%';
       }
-      progressFill.style.width = pct + '%';
     });
 
     var card = el('div', { class: 'card' }, [
