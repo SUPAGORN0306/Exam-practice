@@ -283,7 +283,7 @@
     var el = App.el;
     while (root.firstChild) root.removeChild(root.firstChild);
 
-    // 🔥 แก้ไข: จบชุดเมื่อ understoodCount ครบ (ปัดขวาครบทุกใบ) ไม่ใช่แค่ cards.length === 0
+    // 🔥 แก้ไข: จบชุดเมื่อ understoodCount ครบ (ปัดขวาครบทุกใบ)
     if (understoodCount >= totalCardsCount) {
       root.appendChild(el('div', { class: 'card center', style: 'padding: 40px 20px;' }, [
         el('h2', { text: 'ทบทวนครบทุกใบแล้ว' }),
@@ -297,7 +297,7 @@
     }
 
     if (cards.length === 0) {
-      // fallback: ถ้าไม่มี cards แต่ understoodCount ไม่ครบ (ไม่ควรเกิด) ให้กลับหน้า Setup
+      // Fallback: ถ้าไม่มี cards แต่ understoodCount ไม่ครบ
       App.views.flashcards(root);
       return;
     }
@@ -316,8 +316,8 @@
 
     var q = cards[currentIndex];
 
-    // 🔥 touch-action: none เพื่อให้ swipe บนมือถือทำงานได้ (ไม่ติด pan-y)
-    var scene = el('div', { class: 'flashcard-scene', style: 'touch-action: none;' });
+    // 🔥 ใช้ touch-action: pan-y (อนุญาตให้ Scroll ขึ้นลงได้)
+    var scene = el('div', { class: 'flashcard-scene', style: 'touch-action: pan-y;' });
     var inner = el('div', { class: 'flashcard-inner' + (flipped ? ' is-flipped' : '') });
 
     var front = el('div', { class: 'flashcard-front' }, [
@@ -340,15 +340,15 @@
     scene.appendChild(inner);
     root.appendChild(scene);
 
-    var tracking = false;       // กำลังกดค้างอยู่
-    var dragged = false;        // ลากเกินระยะแล้ว (ถือว่าเป็นการปัด ไม่ใช่การแตะ)
+    var tracking = false;       
+    var dragged = false;        
     var suppressClick = false;
     var startX = 0, startY = 0, currentX = 0, currentY = 0;
     var swipeThreshold = 40;
     var dragSlop = 8;
 
     inner.addEventListener('click', function () {
-      if (suppressClick || animating) return;
+      if (suppressClick || animating) return; 
       flipped = !flipped;
       inner.classList.toggle('is-flipped', flipped);
     });
@@ -366,7 +366,7 @@
 
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp);
-      window.addEventListener('pointercancel', onPointerCancel);
+      window.addEventListener('pointercancel', onPointerCancel); 
     });
 
     function removeWindowListeners() {
@@ -500,7 +500,6 @@
 
         if (direction === 'right') {
           understoodCount++;
-          // 🔥 แก้ไข Index หลังปัดขวา: ถ้า i เกินขอบให้กลับไป 0
           if (i >= cards.length) {
             currentIndex = 0;
           } else {
@@ -509,7 +508,6 @@
         } else {
           // ปัดซ้าย: วนกลับมาท้ายกอง
           cards.push(q);
-          // 🔥 แก้ไข Index หลังปัดซ้าย: ไม่เกินขอบเขต
           if (cards.length <= 1) {
             currentIndex = 0;
           } else {
@@ -520,6 +518,10 @@
 
       flipped = false;
       animating = false;
+      
+      // 🔥 ล้างหน้าจอการ์ดเก่าก่อนวาดการ์ดใหม่ (เพื่อไม่ให้ซ้อนกัน)
+      while (root.firstChild) root.removeChild(root.firstChild);
+      
       renderCard(root);
     }, 380);
   }

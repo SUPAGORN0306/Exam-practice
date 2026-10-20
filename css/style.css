@@ -25,7 +25,7 @@
   --line-height: 1.6;
 
   --tap-min: 48px;
-  --gap: 16px; /* เพิ่มระยะห่าง */
+  --gap: 16px;
   --pad: 16px;
 }
 
@@ -65,7 +65,7 @@ body {
 /* --- Typography & Spacing Fix --- */
 h1, h2, h3 { margin: 0; line-height: 1.4; }
 h1 { font-size: 1.35rem; }
-h2 { font-size: 1.15rem; margin-bottom: 8px; } /* เพิ่มระยะห่างใต้ h2 */
+h2 { font-size: 1.15rem; margin-bottom: 8px; }
 h3 { font-size: 1rem; margin-bottom: 6px; }
 
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -148,7 +148,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: 20px; /* เพิ่ม padding ใน card */
+  border-radius: var(--radius-lg); padding: 20px;
   box-shadow: var(--shadow-sm);
 }
 
@@ -162,20 +162,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .row-between { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-/* ------------------ Forms (ปรับระยะห่างฟอร์มให้ชัดเจน) ------------------ */
+/* ------------------ Forms ------------------ */
 
-.field { display: block; margin-bottom: 20px; } /* เพิ่มระยะห่างระหว่างช่อง */
+.field { display: block; margin-bottom: 20px; }
 .field > .label { 
   display: block; 
   font-weight: 600; 
-  margin-bottom: 8px; /* เพิ่มระยะห่างระหว่าง Label กับ Input */
+  margin-bottom: 8px; 
   font-size: 0.95rem; 
   color: var(--text);
 }
 .field .hint { 
   color: var(--muted); 
   font-size: 0.8rem; 
-  margin-top: 6px; /* เพิ่มระยะห่างใต้ Input */
+  margin-top: 6px; 
   line-height: 1.5;
 }
 .field .error { color: var(--wrong); font-size: 0.85rem; margin-top: 6px; }
@@ -207,7 +207,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   gap: 12px; margin-bottom: 16px;
 }
 
-/* Progress bar */
 .progress-bar {
   flex: 1;
   width: 100%;
@@ -359,6 +358,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   position: relative;
   user-select: none;
   -webkit-user-select: none;
+  /* 🔥 ไม่มี touch-action ที่นี่! ปล่อยให้ JS จัดการเอง */
 }
 
 .flashcard-inner {
@@ -401,7 +401,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   text-align: left;
 }
 
-/* อนิเมชันตอนปัดการ์ด — ใช้กับ .flashcard-inner โดยตรง */
+/* อนิเมชันตอนปัดการ์ด */
 .flashcard-inner.swipe-left {
   transition: transform 0.35s ease-out, opacity 0.35s ease-out !important;
   transform: translateX(-150%) rotate(-18deg) !important;
@@ -448,7 +448,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 .btn-small.btn-primary {
-  /* ให้ปุ่มลัดที่ active ดูเด่นชัด */
   box-shadow: 0 1px 3px rgba(47, 91, 234, 0.35);
 }
 
@@ -475,17 +474,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   user-select: none;
 }
 
-/* ระยะห่างระหว่าง checkbox แต่ละบท */
 #fc-chapter-container .check-row + .check-row {
   border-top: 1px solid var(--border);
 }
 
-/* ระยะห่างของแถวปุ่มลัดจำนวนข้อ */
 #fc-limit-container {
   margin-top: 4px;
 }
 
-/* 🔥 สไตล์ตัวเลขสถิติบนการ์ด (อยู่ตรงกลาง) */
+/* 🔥 สไตล์ตัวเลขสถิติบนการ์ด */
 .flashcard-stat {
   background: var(--border);
   color: var(--text);
@@ -495,63 +492,29 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   display: inline-block; 
-  margin: 8px auto 0; /* ดันให้อยู่ตรงกลาง */
+  margin: 8px auto 0;
   box-shadow: var(--shadow-sm);
   position: relative;
   z-index: 5;
 }
-/* =========================================
-   Session: Scroll Mode Styling
-   ========================================= */
-.choice-btn.scroll-mode {
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 12px 4px !important;
-  border-bottom: 1px solid var(--border) !important;
-  border-radius: 0 !important;
-  margin-bottom: 0 !important;
-  font-size: 1.05rem;
-}
 
-.choice-btn.scroll-mode.selected {
-  background: rgba(47, 91, 234, 0.08) !important;
-  border-radius: var(--radius-md) !important;
-  border-bottom-color: transparent !important;
-}
-
-.choice-btn.scroll-mode.correct {
-  background: rgba(30, 127, 79, 0.08) !important;
-  border-radius: var(--radius-md) !important;
-  border-bottom-color: transparent !important;
-}
-
-.choice-btn.scroll-mode.wrong {
-  background: rgba(192, 57, 43, 0.08) !important;
-  border-radius: var(--radius-md) !important;
-  border-bottom-color: transparent !important;
-}
-
-/* รองรับโหมดมืด */
 html[data-theme='dark'] .flashcard-stat {
   background: rgba(255, 255, 255, 0.1);
 }
-/* =========================================
-   Choice Buttons Enhancements (Selected / Correct / Wrong)
-   ========================================= */
 
-/* 1. ปุ่มที่ถูกเลือก (Selected) */
+/* =========================================
+   Choice Buttons Enhancements
+   ========================================= */
 .choice-btn.selected {
   border-color: var(--primary) !important;
-  background: rgba(47, 91, 234, 0.08) !important; /* สีฟ้าจางๆ */
-  box-shadow: 0 0 0 1px var(--primary) inset !important; /* เพิ่มเส้นขอบซ้อนด้านในให้ดูหนาขึ้น */
+  background: rgba(47, 91, 234, 0.08) !important;
+  box-shadow: 0 0 0 1px var(--primary) inset !important;
 }
 
 html[data-theme='dark'] .choice-btn.selected {
-  background: rgba(127, 160, 255, 0.15) !important; /* โหมดมืด: ฟ้าจางๆ สว่างขึ้น */
+  background: rgba(127, 160, 255, 0.15) !important;
 }
 
-/* 2. ปุ่มที่ตอบถูก (Correct) */
 .choice-btn.correct {
   border-color: var(--correct) !important;
   background: rgba(30, 127, 79, 0.1) !important;
@@ -562,7 +525,6 @@ html[data-theme='dark'] .choice-btn.correct {
   background: rgba(95, 211, 154, 0.15) !important;
 }
 
-/* 3. ปุ่มที่ตอบผิด (Wrong) */
 .choice-btn.wrong {
   border-color: var(--wrong) !important;
   background: rgba(192, 57, 43, 0.1) !important;
@@ -573,30 +535,6 @@ html[data-theme='dark'] .choice-btn.wrong {
   background: rgba(255, 138, 122, 0.15) !important;
 }
 
-/* 4. ลบสไตล์ของโหมด Scroll ทิ้ง (ถ้าคุณรู้สึกว่ามันดูทื่อเกินไป) 
-   หรือถ้าอยากให้โหมด Scroll ยังมีกรอบเหมือนเดิม ให้คอมเมนต์โค้ดด้านล่างนี้ */
-
-.choice-btn.scroll-mode {
-  border: 1px solid var(--border) !important;
-  background: var(--surface) !important;
-  border-radius: var(--radius-md) !important;
-  margin-bottom: 12px !important;
-}
-
-.flashcard-scene, 
-.flashcard-inner,
-.flashcard-front, 
-.flashcard-back {
-  touch-action: pan-y !important; 
-  -webkit-user-select: none; 
-  user-select: none;
-}
-
-/* ซ่อน scrollbar ของการ์ดเพื่อไม่ให้มันแย่งพื้นที่ */
-.flashcard-front::-webkit-scrollbar, 
-.flashcard-back::-webkit-scrollbar { 
-  display: none; 
-}
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
