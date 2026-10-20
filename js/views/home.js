@@ -94,15 +94,32 @@
     else if (Object.keys(progress).length === 0) statusText = 'พร้อมเริ่มชุดแรกของคุณ';
     else statusText = 'ไม่มีข้อค้างทบทวน — ฝึกเพิ่มได้เลย';
 
-    // 🔥 เปลี่ยนตัวเลือกจำนวนข้อเป็น 10, 20, 30, 45, 60, 80, 90
-    var sizeOptions = [10, 20, 30, 45, 60, 80, 90];
+    // 🔥 สร้างตัวเลือกขนาดชุดจากจำนวนข้อสอบที่มีจริง
+    var totalQuestions = questions.length;
+    var presets = [10, 20, 30, 45, 60, 80, 90];
+    var sizeOptions = [];
+    presets.forEach(function (val) {
+      if (val <= totalQuestions) sizeOptions.push(val);
+    });
+    // ถ้าจำนวนข้อสอบไม่ตรงกับ preset ไหนเลย ให้เพิ่มจำนวนจริงเข้าไป
+    if (totalQuestions > 0 && presets.indexOf(totalQuestions) === -1) {
+      sizeOptions.push(totalQuestions);
+    }
+    // เพิ่ม "ทั้งหมด" ไว้ท้ายสุด (ใช้ค่า 0 แทน)
+    sizeOptions.push(0);
+
     var chosenN = settings.defaultSessionSize || 20;
-    if (questions.length < chosenN) chosenN = Math.min(questions.length, 10) || 10;
+    // ถ้าค่าเริ่มต้นไม่มีใน options ให้ใช้ตัวเลือกแรก
+    if (sizeOptions.indexOf(chosenN) === -1) {
+      chosenN = sizeOptions[0];
+    }
+
     var sizeRow = el('div', { class: 'row' });
     sizeOptions.forEach(function (n) {
+      var label = (n === 0) ? 'ทั้งหมด' : n + ' ข้อ';
       var b = el('button', {
         class: 'chip' + (n === chosenN ? ' selected' : ''),
-        text: n + ' ข้อ',
+        text: label,
         onclick: function () {
           chosenN = n;
           sizeRow.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('selected'); });
@@ -121,10 +138,11 @@
         style: 'margin-top:16px; font-size:1.05rem; min-height:56px;',
         text: 'เริ่มฝึกวันนี้',
         onclick: function () {
+          var nToUse = (chosenN === 0) ? totalQuestions : chosenN;
           var result = App.scheduler.buildAutoSession({
             questions: questions, progress: progress,
             topicRecent: App.storage.getTopicRecent(),
-            n: chosenN, filter: { subject: null, topics: [] }
+            n: nToUse, filter: { subject: null, topics: [] }
           });
           if (!result.ids.length) { App.toast('ไม่มีข้อสอบให้ฝึก'); return; }
           App.views.session.startNew(result.ids, result.meta);
@@ -246,8 +264,9 @@
         el('h3', { text: 'ทบทวนข้อที่เคยผิด' }),
         el('p', { class: 'muted small', text: 'มี ' + wrongCount + ' ข้อที่ยังไม่แม่น' }),
         el('button', { class: 'btn btn-block', text: 'ทบทวนข้อที่เคยผิด', onclick: function () {
+          var nToUse = (chosenN === 0) ? totalQuestions : chosenN;
           var res = App.scheduler.buildReviewWrongSession({
-            questions: questions, progress: progress, n: chosenN,
+            questions: questions, progress: progress, n: nToUse,
             filter: { subject: null, topics: [] }
           });
           if (!res.ids.length) { App.toast('ไม่มีข้อที่ต้องทบทวน'); return; }
@@ -291,33 +310,81 @@
     Object.keys(topics).forEach(function (t) {
       topicSelect.appendChild(el('option', { value: t, text: t + ' (' + topics[t] + ' ข้อ)' }));
     });
-    topicSelect.addEventListener('change', function () { selectedTopic = topicSelect.value; });
+    topicSelect.addEventListener('change', function () { 
+      selectedTopic = topicSelect.value; 
+      updateSizeOptions();
+    });
     sheet.appendChild(el('div', { class: 'field' }, [topicSelect]));
 
-    // 🔥 เปลี่ยนตัวเลือกจำนวนข้อใน Bottom Sheet เป็น 10, 20, 30, 45, 60, 80, 90
+    // 🔥 พื้นที่แสดงปุ่มจำนวนข้อ (จะอัปเดตตาม Topic ที่เลือก)
     var nRow = el('div', { class: 'row' });
-    [10, 20, 30, 45, 60, 80, 90].forEach(function (val) {
-      var b = el('button', {
-        class: 'chip' + (val === n ? ' selected' : ''), text: val + ' ข้อ',
-        onclick: function () {
-          n = val;
-          nRow.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('selected'); });
-          b.classList.add('selected');
-        }
-      });
-      nRow.appendChild(b);
-    });
     sheet.appendChild(el('p', { class: 'muted small', text: 'จำนวนข้อ' }));
     sheet.appendChild(nRow);
+
+    function updateSizeOptions() {
+      while (nRow.firstChild) nRow.removeChild(nRow.firstChild);
+
+      var totalAvailable = questions.filter(function(q) { 
+        return q.subject === subject.id && (!selectedTopic || q.topic === selectedTopic); 
+      }).length;
+
+      var presets = [10, 20, 30, 45, 60, 80, 90];
+      var options = [];
+      presets.forEach(function (val) {
+        if (val <= totalAvailable) options.push(val);
+      });
+      
+      if (totalAvailable > 0 && presets.indexOf(totalAvailable) === -1) {
+        options.push(totalAvailable);
+      }
+      
+      // ถ้าค่าที่เลือกไว้ (n) ไม่อยู่ใน options ให้เปลี่ยนเป็น "ทั้งหมด" (0)
+      if (options.indexOf(n) === -1) {
+        n = 0;
+      }
+
+      options.forEach(function (val) {
+        var b = el('button', {
+          class: 'chip' + (val === n ? ' selected' : ''), 
+          text: val + ' ข้อ',
+          onclick: function () {
+            n = val;
+            nRow.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('selected'); });
+            b.classList.add('selected');
+          }
+        });
+        nRow.appendChild(b);
+      });
+
+      // ปุ่ม "ทั้งหมด"
+      var bAll = el('button', {
+        class: 'chip' + (n === 0 ? ' selected' : ''),
+        text: 'ทั้งหมด',
+        onclick: function () {
+          n = 0;
+          nRow.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('selected'); });
+          bAll.classList.add('selected');
+        }
+      });
+      nRow.appendChild(bAll);
+    }
+
+    updateSizeOptions();
 
     sheet.appendChild(el('button', {
       class: 'btn btn-primary btn-block', style: 'margin-top:16px;',
       text: 'เริ่มฝึกวิชานี้',
       onclick: function () {
+        var totalAvailable = questions.filter(function(q) { 
+          return q.subject === subject.id && (!selectedTopic || q.topic === selectedTopic); 
+        }).length;
+        
+        var nToUse = (n === 0) ? totalAvailable : n;
+        
         var res = App.scheduler.buildAutoSession({
           questions: questions, progress: progress,
           topicRecent: App.storage.getTopicRecent(),
-          n: n, filter: { subject: subject.id, topics: selectedTopic ? [selectedTopic] : [] }
+          n: nToUse, filter: { subject: subject.id, topics: selectedTopic ? [selectedTopic] : [] }
         });
         if (!res.ids.length) { App.toast('ไม่มีข้อในเงื่อนไขนี้'); return; }
         closeSheet();

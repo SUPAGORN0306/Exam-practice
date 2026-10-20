@@ -358,7 +358,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   position: relative;
   user-select: none;
   -webkit-user-select: none;
-  /* 🔥 ไม่มี touch-action ที่นี่! ปล่อยให้ JS จัดการเอง */
+  touch-action: none; 
 }
 
 .flashcard-inner {
