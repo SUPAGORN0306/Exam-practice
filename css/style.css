@@ -336,16 +336,38 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* ------------------ Wide screens ------------------ */
 
 @media (min-width: 900px) {
+  /* 🔥 เปลี่ยน Nav ให้เป็นแถบด้านบน */
   .bottom-nav {
-    position: static; order: -1; border-top: none;
+    position: sticky; top: 0; /* ให้ติดขอบบนเวลาเลื่อน */
+    order: -1; /* ดันขึ้นไปบนสุด */
+    border-top: none;
     border-bottom: 1px solid var(--border);
-    justify-content: flex-start; gap: 8px;
-    padding: 0 var(--pad); padding-bottom: 0;
+    justify-content: center; /* จัดเมนูไว้ตรงกลาง */
+    gap: 8px;
+    padding: 0 var(--pad);
+    z-index: 30; /* ให้อยู่เหนือ Header */
   }
-  .nav-item { flex: 0 0 auto; flex-direction: row; gap: 6px; padding: 10px 14px; font-size: 0.95rem; }
-  #app { display: block; }
-  .main { padding-bottom: var(--pad); }
-  .confidence-bar { bottom: var(--pad); }
+  
+  .nav-item { 
+    flex: 0 0 auto; 
+    flex-direction: row; 
+    gap: 6px; 
+    padding: 10px 20px; 
+    font-size: 0.95rem; 
+  }
+  
+  /* 🔥 ลบ display: block ออก เพื่อให้ Flexbox จัดเรียง */
+  #app { 
+    display: flex; 
+    flex-direction: column; 
+    min-height: 100vh; 
+  }
+
+  /* ให้เนื้อหากินพื้นที่ที่เหลือ */
+  .main { 
+    flex: 1; 
+    padding-bottom: 40px; 
+  }
 }
 
 /* ------------------ Flashcard 3D & Swipe ------------------ */
