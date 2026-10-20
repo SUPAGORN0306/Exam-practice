@@ -534,7 +534,68 @@ button, input, select, textarea { font: inherit; color: inherit; }
 html[data-theme='dark'] .flashcard-stat {
   background: rgba(255, 255, 255, 0.1);
 }
+/* =========================================
+   Choice Buttons Enhancements (Selected / Correct / Wrong)
+   ========================================= */
 
+/* 1. ปุ่มที่ถูกเลือก (Selected) */
+.choice-btn.selected {
+  border-color: var(--primary) !important;
+  background: rgba(47, 91, 234, 0.08) !important; /* สีฟ้าจางๆ */
+  box-shadow: 0 0 0 1px var(--primary) inset !important; /* เพิ่มเส้นขอบซ้อนด้านในให้ดูหนาขึ้น */
+}
+
+html[data-theme='dark'] .choice-btn.selected {
+  background: rgba(127, 160, 255, 0.15) !important; /* โหมดมืด: ฟ้าจางๆ สว่างขึ้น */
+}
+
+/* 2. ปุ่มที่ตอบถูก (Correct) */
+.choice-btn.correct {
+  border-color: var(--correct) !important;
+  background: rgba(30, 127, 79, 0.1) !important;
+  box-shadow: 0 0 0 1px var(--correct) inset !important;
+}
+
+html[data-theme='dark'] .choice-btn.correct {
+  background: rgba(95, 211, 154, 0.15) !important;
+}
+
+/* 3. ปุ่มที่ตอบผิด (Wrong) */
+.choice-btn.wrong {
+  border-color: var(--wrong) !important;
+  background: rgba(192, 57, 43, 0.1) !important;
+  box-shadow: 0 0 0 1px var(--wrong) inset !important;
+}
+
+html[data-theme='dark'] .choice-btn.wrong {
+  background: rgba(255, 138, 122, 0.15) !important;
+}
+
+/* 4. ลบสไตล์ของโหมด Scroll ทิ้ง (ถ้าคุณรู้สึกว่ามันดูทื่อเกินไป) 
+   หรือถ้าอยากให้โหมด Scroll ยังมีกรอบเหมือนเดิม ให้คอมเมนต์โค้ดด้านล่างนี้ */
+/*
+.choice-btn.scroll-mode {
+  border: 1px solid var(--border) !important;
+  background: var(--surface) !important;
+  border-radius: var(--radius-md) !important;
+  margin-bottom: 12px !important;
+}
+*/
+/* 🔥 บังคับให้การ์ดยอมให้ปัดบนมือถือแบบไม่ติดขัด */
+.flashcard-scene, 
+.flashcard-inner,
+.flashcard-front, 
+.flashcard-back {
+  touch-action: pan-y !important; /* ให้มันสกอลล์ขึ้นลงได้ แต่ให้ JS จัดการแนวนอน */
+  -webkit-user-select: none; /* กันการคลุมดำข้อความ */
+  user-select: none;
+}
+
+/* ซ่อน scrollbar ของการ์ดเพื่อไม่ให้มันแย่งพื้นที่ */
+.flashcard-front::-webkit-scrollbar, 
+.flashcard-back::-webkit-scrollbar { 
+  display: none; 
+}
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }

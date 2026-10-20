@@ -89,14 +89,14 @@
 
     var order = session.choiceOrders[q.id] || q.choices.map(function (_, i) { return i; });
     
-    // 🔥 แก้ไขการค้นหาคำตอบเดิม: ใช้ String() ครอบ isRecheck เพื่อให้เทียบกันติด 100%
+    // 🔥 ค้นหาคำตอบที่เคยเลือกไว้ (ทั้งที่ดูเฉลยแล้ว และยังไม่ดูเฉลย)
     var existing = session.answers.find(function (a) { 
       return a.qid === q.id && String(a.isRecheck) === String(current.isRecheck); 
     });
     
     var isScrollMode = (localStorage.getItem('answerMode') || 'button') === 'scroll';
 
-    // --- Top bar ---
+    // --- Top bar (แถวเดียว) ---
     var isTimed = session.timer.mode === 'timed';
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs || session.timer.elapsedMs || 0) });
     var totalEl = el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: isTimed ? formatMs(session.timer.totalMs) : '' });
@@ -118,7 +118,6 @@
       el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [el('div', { class: 'fill', style: 'width:' + Math.round((session.index / session.queue.length) * 100) + '%' })]),
       totalEl
     ]);
-    
     root.appendChild(topContainer);
 
     // --- Timer tick ---
@@ -143,8 +142,9 @@
       el('p', { style: 'font-size:var(--font-question); white-space:pre-wrap; word-break:break-word; margin-top:8px;', text: q.question })
     ]);
 
+    // 🔥 ตรวจสอบคำตอบที่เคยเลือกไว้
     var chosen = existing ? existing.chosen : null;
-    var revealed = !!existing;
+    var revealed = existing ? !!existing.confidence : false; // ดูเฉลยแล้วหรือยัง (ถ้ามี confidence ถือว่าดูแล้ว)
 
     var choicesWrap = el('div', { style: 'margin-top:12px;' });
     
@@ -156,6 +156,20 @@
         onclick: function () {
           if (revealed) return;
           chosen = origIdx;
+          
+          // 🔥 เซฟคำตอบลง Session ทันที (เผื่อเปลี่ยนข้อแล้วกลับมา)
+          var s = App.storage.getActiveSession();
+          var cq = s.queue[s.index];
+          var tempExisting = s.answers.find(function(a) { return a.qid === q.id && String(a.isRecheck) === String(cq.isRecheck); });
+          
+          if (!tempExisting) {
+             s.answers.push({ qid: q.id, chosen: chosen, confidence: null, isRecheck: cq.isRecheck, correct: null });
+          } else {
+             tempExisting.chosen = chosen;
+          }
+          App.storage.setActiveSession(s);
+
+          // อัปเดตสีปุ่ม
           choicesWrap.querySelectorAll('.choice-btn').forEach(function (b, i) {
             b.classList.toggle('selected', order[i] === chosen);
           });
@@ -169,7 +183,7 @@
         if (origIdx === q.answer) btn.classList.add('correct');
         if (origIdx === chosen && chosen !== q.answer) btn.classList.add('wrong');
       } else if (chosen === origIdx) {
-        btn.classList.add('selected');
+        btn.classList.add('selected'); // 🔥 ทำให้ติดสีเมื่อกลับมา
       }
       choicesWrap.appendChild(btn);
     });
@@ -203,10 +217,10 @@
     root.appendChild(card);
     root.appendChild(bottomWrap);
 
-    // 🔥 ปุ่ม Navigation ชิดซ้าย-ขวา ให้ตรงกับ Card
+    // 🔥 ปุ่ม Navigation ชิดซ้าย-ขวา ล่างสุด
     var isLastQ = (session.index === session.queue.length - 1);
     
-    root.appendChild(el('div', { style: 'display:flex; justify-content:space-between; margin-top:24px; margin-bottom:24px;' }, [
+    root.appendChild(el('div', { style: 'display:flex; justify-content:space-between; margin-top:32px; margin-bottom:24px;' }, [
       el('button', {
         class: 'icon-btn', 'aria-label': 'ย้อนกลับ', text: '<',
         style: 'width:56px; height:56px; font-size:1.5rem;' + (session.index === 0 ? 'opacity:0.3; pointer-events:none;' : ''),
@@ -244,12 +258,19 @@
     var type = App.scheduler.classifyAnswer(correct, confidence);
     var timeMs = 1000; 
 
-    var answer = {
-      qid: q.id, chosen: chosen, correct: correct, confidence: confidence,
-      timeMs: timeMs, cause: null, isRecheck: current.isRecheck === true, type: type
-    };
+    // อัปเดตข้อมูลเดิม
+    var existing = session.answers.find(function(a) { 
+      return a.qid === q.id && String(a.isRecheck) === String(current.isRecheck); 
+    });
 
-    if (!answer.isRecheck) {
+    if (existing) {
+      existing.confidence = confidence;
+      existing.correct = correct;
+      existing.type = type;
+    }
+
+    // บันทึก Leitner
+    if (!current.isRecheck) {
       var progress = App.storage.getProgress();
       var prev = progress[q.id] || {};
       var nbox = App.scheduler.nextBox(prev, type, Date.now());
@@ -271,10 +292,6 @@
       App.recordDaily(q, confidence, correct, timeMs);
     }
 
-    session.answers = session.answers.filter(function(a) { 
-      return a.qid !== q.id || String(a.isRecheck) !== String(current.isRecheck); 
-    });
-    session.answers.push(answer);
     session.timer.elapsedMs = sessionElapsedMs;
     App.storage.setActiveSession(session);
     
@@ -360,7 +377,8 @@
 
   function finishSession(session) {
     clearTimer();
-    var first = session.answers.filter(function (a) { return !a.isRecheck; });
+    // 🔥 ดึงเฉพาะข้อที่กดดูเฉลยแล้ว (มี confidence) ไปคำนวณผลสรุป
+    var first = session.answers.filter(function (a) { return !a.isRecheck && a.confidence; });
     var correct = first.filter(function (a) { return a.correct; }).length;
 
     var summary = {
