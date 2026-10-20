@@ -152,9 +152,13 @@
   }
 
   // ==========================================
-  // 🔥 ฟังก์ชันสร้าง Grid Navigator (แบบกรอบสี)
+  // 🔥 ฟังก์ชันสร้าง Grid Navigator (ดึงข้อมูลสดๆ)
   // ==========================================
-  function openGridNavigator(session, onSelect) {
+  function openGridNavigator(onSelect) {
+    // 🔥 ดึงข้อมูลสดๆ จาก Storage ทันที
+    var session = App.storage.getActiveSession();
+    if (!session) return;
+
     var el = App.el;
     var overlay = el('div', {
       style: 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:60; display:flex; align-items:flex-end; justify-content:flex-start;',
@@ -189,7 +193,6 @@
       });
       var isCurrent = (session.index === idx);
       
-      // 🔥 สีกรอบ (ไม่ทึบ)
       var bgColor = answered ? 'rgba(30,127,79,0.1)' : 'rgba(192,57,43,0.1)';
       var borderColor = answered ? 'var(--correct)' : 'var(--wrong)';
       var textColor = answered ? 'var(--correct)' : 'var(--wrong)';
@@ -389,7 +392,7 @@
       'aria-label': 'เปิดผังข้อสอบ',
       text: '▦',
       onclick: function () {
-        openGridNavigator(s, function (idx) {
+        openGridNavigator(function (idx) {
           var targetCard = document.getElementById('q-card-' + idx);
           if (targetCard) {
             targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -581,10 +584,11 @@
       'aria-label': 'เปิดผังข้อสอบ',
       text: '▦',
       onclick: function () {
-        openGridNavigator(s, function (idx) {
-          s.index = idx;
-          s.timer.elapsedMs = sessionElapsedMs;
-          App.storage.setActiveSession(s);
+        openGridNavigator(function (idx) {
+          var activeS = App.storage.getActiveSession();
+          activeS.index = idx;
+          activeS.timer.elapsedMs = sessionElapsedMs;
+          App.storage.setActiveSession(activeS);
           App.render();
         });
       }
