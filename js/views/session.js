@@ -88,9 +88,12 @@
     }
 
     var order = session.choiceOrders[q.id] || q.choices.map(function (_, i) { return i; });
+    
+    // 🔥 แก้ไขการค้นหาคำตอบเดิม: ใช้ String() ครอบ isRecheck เพื่อให้เทียบกันติด 100%
     var existing = session.answers.find(function (a) { 
-      return a.qid === q.id && !!a.isRecheck === !!current.isRecheck; 
+      return a.qid === q.id && String(a.isRecheck) === String(current.isRecheck); 
     });
+    
     var isScrollMode = (localStorage.getItem('answerMode') || 'button') === 'scroll';
 
     // --- Top bar ---
@@ -200,7 +203,7 @@
     root.appendChild(card);
     root.appendChild(bottomWrap);
 
-    // 🔥 ปุ่ม Navigation ชิดซ้าย-ขวา ให้ตรงกับ Card (กล่องโจทย์)
+    // 🔥 ปุ่ม Navigation ชิดซ้าย-ขวา ให้ตรงกับ Card
     var isLastQ = (session.index === session.queue.length - 1);
     
     root.appendChild(el('div', { style: 'display:flex; justify-content:space-between; margin-top:24px; margin-bottom:24px;' }, [
@@ -269,7 +272,7 @@
     }
 
     session.answers = session.answers.filter(function(a) { 
-      return a.qid !== q.id || !!a.isRecheck !== !!current.isRecheck; 
+      return a.qid !== q.id || String(a.isRecheck) !== String(current.isRecheck); 
     });
     session.answers.push(answer);
     session.timer.elapsedMs = sessionElapsedMs;

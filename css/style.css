@@ -498,6 +498,37 @@ button, input, select, textarea { font: inherit; color: inherit; }
   position: relative;
   z-index: 5;
 }
+/* =========================================
+   Session: Scroll Mode Styling
+   ========================================= */
+.choice-btn.scroll-mode {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 12px 4px !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  margin-bottom: 0 !important;
+  font-size: 1.05rem;
+}
+
+.choice-btn.scroll-mode.selected {
+  background: rgba(47, 91, 234, 0.08) !important;
+  border-radius: var(--radius-md) !important;
+  border-bottom-color: transparent !important;
+}
+
+.choice-btn.scroll-mode.correct {
+  background: rgba(30, 127, 79, 0.08) !important;
+  border-radius: var(--radius-md) !important;
+  border-bottom-color: transparent !important;
+}
+
+.choice-btn.scroll-mode.wrong {
+  background: rgba(192, 57, 43, 0.08) !important;
+  border-radius: var(--radius-md) !important;
+  border-bottom-color: transparent !important;
+}
 
 /* รองรับโหมดมืด */
 html[data-theme='dark'] .flashcard-stat {

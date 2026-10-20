@@ -1,9 +1,11 @@
-/* Flashcards mode — Swipe (Leitner) + Arrow Navigation + Submit + Stat */
+/* Flashcards mode — Swipe (Leitner) + Arrow Navigation + Stat */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
 
-  var cards = [];
+  var cards = []; // การ์ดที่ยังไม่ได้เรียนรู้ (ที่เหลืออยู่ในกอง)
+  var totalCardsCount = 0; // จำนวนการ์ดทั้งหมดตอนเริ่ม
+  var understoodCount = 0; // 🔥 จำนวนการ์ดที่ "เข้าใจแล้ว" (ปัดถูก/ปัดขวา)
   var currentIndex = 0;
   var flipped = false;
 
@@ -254,7 +256,9 @@
       merged = merged.slice(0, limit);
     }
     cards = merged;
-
+    
+    totalCardsCount = cards.length; // เก็บจำนวนทั้งหมด
+    understoodCount = 0; // รีเซ็ตจำนวนที่เข้าใจ
     currentIndex = 0;
     flipped = false;
 
@@ -265,41 +269,39 @@
     var el = App.el;
     while (root.firstChild) root.removeChild(root.firstChild);
 
-    // Header แบบมินิมอล
+    // 🔥 Header: ปุ่มออก + ตัวเลขสถิติ (อยู่ด้านนอกการ์ด)
     root.appendChild(el('div', {
       class: 'session-top',
       style: 'display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;'
     }, [
       el('button', { class: 'icon-btn', text: '✕', onclick: function () { App.navigate('home'); } }),
-      el('div', { class: 'small muted', style: 'font-weight:600;', text: 'โหมดทบทวน' }),
-      el('div', { style: 'width:48px;' })
+      
+      // 🔥 ตัวเลขสถิติ (เข้าใจแล้ว / ทั้งหมด)
+      el('div', { 
+        class: 'small muted', 
+        style: 'font-weight:600; font-variant-numeric: tabular-nums; font-size:1.1rem;', 
+        text: understoodCount + ' / ' + totalCardsCount 
+      }),
+      
+      el('div', { style: 'width:48px;' }) // ดันให้อยู่ตรงกลาง
     ]));
 
     var q = cards[currentIndex];
-    var cardStat = (currentIndex + 1) + ' / ' + cards.length; // 🔥 คำนวณสถิติ
 
-    // 🔥 touch-action: none เพื่อให้มือถือปัดได้
+    // touch-action: none เพื่อให้มือถือปัดได้
     var scene = el('div', { class: 'flashcard-scene', style: 'touch-action: none;' });
     var inner = el('div', { class: 'flashcard-inner' + (flipped ? ' is-flipped' : '') });
 
-    // หน้าแรก (Front)
+    // หน้าแรก (Front) - เอาตัวเลขสถิติออกแล้ว
     var front = el('div', { class: 'flashcard-front' }, [
       el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic }),
-      
-      // 🔥 ตัวเลขสถิติ ตรงกลาง
-      el('div', { class: 'flashcard-stat', text: cardStat }),
-      
       el('h2', { style: 'margin-top:16px; white-space:pre-wrap;', text: q.question }),
       el('p', { class: 'muted', style: 'margin-top:32px; font-size:0.9rem;', text: 'แตะเพื่อพลิกดูเฉลย' })
     ]);
 
-    // หน้าหลัง (Back)
+    // หน้าหลัง (Back) - เอาตัวเลขสถิติออกแล้ว
     var back = el('div', { class: 'flashcard-back' }, [
       el('div', { class: 'small muted', text: 'เฉลย' }),
-      
-      // 🔥 ตัวเลขสถิติ ตรงกลาง
-      el('div', { class: 'flashcard-stat', text: cardStat }),
-
       el('h2', { style: 'margin-top:12px; color: var(--correct);', text: q.choices[q.answer] }),
       el('div', { style: 'margin-top:16px; text-align:left; width:100%; background:var(--bg); padding:16px; border-radius:12px;' }, [
         el('div', { class: 'small muted', text: 'คำอธิบาย:' }),
@@ -325,7 +327,9 @@
 
     scene.addEventListener('pointerdown', function (e) {
       if (e.target.closest('button')) return;
-      if (e.cancelable) e.preventDefault(); // 🔥 หยุด Scroll
+      
+      // สั่งหยุด Scroll หน้าจอทันที
+      if (e.cancelable) e.preventDefault(); 
       
       isDragging = true;
       startX = e.clientX;
@@ -372,7 +376,7 @@
       currentX = 0; currentY = 0;
     });
 
-    // 🔥 ปุ่มควบคุมด้านล่าง: [ < ] [ สุ่มข้อ ] [ > หรือ Submit ]
+    // 🔥 ปุ่มควบคุมด้านล่าง: [ < ] [ สุ่มข้อ ] [ > ]
     var isLastCard = (currentIndex === cards.length - 1);
 
     root.appendChild(el('div', { class: 'row', style: 'margin-top:24px; justify-content:center; gap:16px;' }, [
@@ -438,8 +442,15 @@
     inner.classList.add(direction === 'left' ? 'swipe-left' : 'swipe-right');
 
     setTimeout(function () {
+      // อัปเดต Leitner
       updateBox(q, direction === 'right');
       
+      // 🔥 ถ้าปัดขวา (จำได้) ให้เพิ่มจำนวนที่เข้าใจแล้ว
+      if (direction === 'right') {
+        understoodCount++;
+      }
+      
+      // เอาออกจากกอง
       cards.splice(currentIndex, 1);
       
       if (cards.length === 0) {
