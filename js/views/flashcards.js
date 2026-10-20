@@ -3,9 +3,9 @@
   window.App = window.App || {};
   App.views = App.views || {};
 
-  var cards = []; // การ์ดที่ยังไม่ได้เรียนรู้
+  var cards = []; // การ์ดที่ยังไม่ได้เรียนรู้ (ที่เหลืออยู่ในกอง)
   var totalCardsCount = 0; 
-  var understoodCount = 0; // จำนวนที่ปัดขวา (เข้าใจ)
+  var understoodCount = 0; // จำนวนที่ปัดขวา (เข้าใจแล้ว)
   var currentIndex = 0;
   var flipped = false;
 
@@ -222,6 +222,9 @@
   };
 
   function startSession(root) {
+    // 🔥 ล้างหน้าจอ Setup ก่อนวาดการ์ด
+    while (root.firstChild) root.removeChild(root.firstChild);
+
     var questions = App.loadQuestions();
     var progress = App.storage.getProgress();
 
@@ -274,10 +277,13 @@
       class: 'session-top',
       style: 'display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;'
     }, [
-      el('button', { class: 'icon-btn', text: '✕', onclick: function () { App.navigate('home'); } }),
+      el('button', { class: 'icon-btn', text: '✕', onclick: function () { App.views.flashcards(root); } }), // กลับไปหน้า Setup
       el('div', { class: 'small muted', style: 'font-weight:600; font-variant-numeric: tabular-nums; font-size:1.1rem;', text: understoodCount + ' / ' + totalCardsCount }),
       el('div', { style: 'width:48px;' })
     ]));
+
+    // 🔥 กัน Error กรณีที่กองว่างแล้วแต่ยัง render
+    if (!cards[currentIndex]) return;
 
     var q = cards[currentIndex];
 
@@ -306,7 +312,6 @@
 
     var isDragging = false;
     var startX = 0, startY = 0, currentX = 0, currentY = 0;
-    // 🔥 ลด Threshold ลงเหลือ 40px (ปัดนิดเดียวก็ติด)
     var swipeThreshold = 40; 
 
     inner.addEventListener('click', function (e) {
@@ -326,7 +331,6 @@
       currentY = 0;
       inner.style.transition = 'none';
       
-      // 🔥 ใช้ window แทน scene เพื่อให้จับการลากได้ลื่นไหลไม่หลุดขอบ
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp);
     });
@@ -337,7 +341,7 @@
       currentY = e.clientY - startY;
 
       if (Math.abs(currentX) > Math.abs(currentY)) {
-        if (e.cancelable) e.preventDefault(); // ป้องกันการสกอลล์ตอนลากแนวนอน
+        if (e.cancelable) e.preventDefault(); 
         var rotate = currentX * 0.05;
         inner.style.transform = 'translateX(' + currentX + 'px) rotate(' + rotate + 'deg)';
       }
@@ -363,8 +367,7 @@
       currentX = 0; currentY = 0;
     }
 
-    // 🔥 ลบปุ่ม Submit/จบการทบทวนออกหมดแล้ว
-    // มีแค่ปุ่ม < , สุ่มข้อ , > สำหรับคนไม่สะดวกปัด
+    // 🔥 ปุ่ม < > และ สุ่มข้อ จะทำงานในกรอบของ cards.length (กองที่ยังไม่ปัด)
     root.appendChild(el('div', { class: 'row', style: 'margin-top:24px; justify-content:center; gap:16px;' }, [
       
       // ย้อนกลับ
@@ -379,7 +382,7 @@
         }
       }),
 
-      // สุ่มข้อ
+      // สุ่มข้อ (วนเฉพาะในกองที่ยังไม่ปัด)
       el('button', { 
         class: 'btn',
         style: 'min-width:100px;',
@@ -428,10 +431,10 @@
         understoodCount++;
       }
       
-      // เอาการ์ดออกจากกอง
+      // เอาการ์ดออกจากกอง (ไม่ว่าจะปัดซ้ายหรือขวา ก็หลุดจากกอง)
       cards.splice(currentIndex, 1);
       
-      // 🔥 ถ้าไม่มีข้อสอบเหลือแล้ว (ปัดขวาจนหมด) ค่อยกลับไปหน้าหลัก
+      // ถ้าไม่มีข้อสอบเหลือแล้ว (ปัดครบทุกใบ) ค่อยกลับไปหน้าหลัก
       if (cards.length === 0) {
         App.toast('ทบทวนครบทุกใบแล้ว');
         App.views.flashcards(root);
