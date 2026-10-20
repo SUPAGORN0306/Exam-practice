@@ -94,7 +94,8 @@
     else if (Object.keys(progress).length === 0) statusText = 'พร้อมเริ่มชุดแรกของคุณ';
     else statusText = 'ไม่มีข้อค้างทบทวน — ฝึกเพิ่มได้เลย';
 
-    var sizeOptions = [10, 20, 30];
+    // 🔥 เปลี่ยนตัวเลือกจำนวนข้อเป็น 10, 20, 30, 45, 60, 80, 90
+    var sizeOptions = [10, 20, 30, 45, 60, 80, 90];
     var chosenN = settings.defaultSessionSize || 20;
     if (questions.length < chosenN) chosenN = Math.min(questions.length, 10) || 10;
     var sizeRow = el('div', { class: 'row' });
@@ -150,11 +151,10 @@
       })
     ]));
 
-    // ---- Goal + streak (แก้ไขให้หยุดเมื่อถึงเป้า) ----
+    // ---- Goal + streak ----
     var answeredToday = App.stats.dailyAnsweredCount(daily, today);
     var goal = settings.dailyGoal || 20;
     
-    // 🔥 ตรวจสอบว่าถึงเป้าหมายหรือยัง
     var isGoalMet = answeredToday >= goal;
     var displayCount = isGoalMet ? goal : answeredToday;
     var pct = Math.min(1, goal ? displayCount / goal : 0);
@@ -174,7 +174,6 @@
     var fgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     fgCircle.setAttribute('cx', '40'); fgCircle.setAttribute('cy', '40');
     fgCircle.setAttribute('r', String(ringR)); fgCircle.setAttribute('fill', 'none');
-    // 🔥 ถ้าถึงเป้าแล้วให้เป็นสีเขียว
     fgCircle.setAttribute('stroke', isGoalMet ? 'var(--correct)' : 'var(--primary)');
     fgCircle.setAttribute('stroke-width', '8');
     fgCircle.setAttribute('stroke-linecap', 'round');
@@ -205,7 +204,7 @@
       ])
     ]));
 
-    // ---- Subject cards (แก้ไขการแสดงผล %) ----
+    // ---- Subject cards ----
     var subjectSection = el('div', { class: 'stack' });
     subjectSection.appendChild(el('div', { class: 'section-title', text: 'ความคืบหน้ารายวิชา' }));
     
@@ -294,8 +293,10 @@
     });
     topicSelect.addEventListener('change', function () { selectedTopic = topicSelect.value; });
     sheet.appendChild(el('div', { class: 'field' }, [topicSelect]));
+
+    // 🔥 เปลี่ยนตัวเลือกจำนวนข้อใน Bottom Sheet เป็น 10, 20, 30, 45, 60, 80, 90
     var nRow = el('div', { class: 'row' });
-    [10, 20, 30].forEach(function (val) {
+    [10, 20, 30, 45, 60, 80, 90].forEach(function (val) {
       var b = el('button', {
         class: 'chip' + (val === n ? ' selected' : ''), text: val + ' ข้อ',
         onclick: function () {
@@ -308,6 +309,7 @@
     });
     sheet.appendChild(el('p', { class: 'muted small', text: 'จำนวนข้อ' }));
     sheet.appendChild(nRow);
+
     sheet.appendChild(el('button', {
       class: 'btn btn-primary btn-block', style: 'margin-top:16px;',
       text: 'เริ่มฝึกวิชานี้',
