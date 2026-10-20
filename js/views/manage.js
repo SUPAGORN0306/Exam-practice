@@ -60,6 +60,71 @@
     var el = App.el;
     var questions = App.loadQuestions();
 
+    // --- ส่วนที่เพิ่มใหม่: ระบบจัดการบท ---
+    var topicsMap = {};
+    questions.forEach(function(q) {
+      if (!topicsMap[q.topic]) topicsMap[q.topic] = { count: 0, subject: q.subject };
+      topicsMap[q.topic].count++;
+    });
+    var uniqueTopics = Object.keys(topicsMap).sort();
+
+    var topicManageWrap = el('div', { class: 'stack', style: 'margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px;' });
+    if (uniqueTopics.length > 0) {
+      topicManageWrap.appendChild(el('div', { class: 'label', text: 'จัดการบทเรียน' }));
+      uniqueTopics.forEach(function(topicName) {
+        var row = el('div', { class: 'row-between', style: 'background: var(--bg); padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; align-items: center;' }, [
+          el('div', null, [
+            el('div', { style: 'font-weight: 600; font-size: 0.95rem;', text: topicName }),
+            el('div', { class: 'small muted', text: topicsMap[topicName].count + ' ข้อ' })
+          ]),
+          el('div', { class: 'row' }, [
+            el('button', {
+              class: 'btn btn-ghost small', // สมมติว่ามีคลาสนี้ หรือใช้ inline style
+              style: 'padding: 4px 8px; font-size: 0.85rem;',
+              text: 'เปลี่ยนชื่อ',
+              onclick: function() {
+                var newName = window.prompt('เปลี่ยนชื่อบท "' + topicName + '" เป็น:', topicName);
+                if (newName && newName.trim() !== '' && newName !== topicName) {
+                  var all = App.loadQuestions();
+                  all.forEach(function(q) {
+                    if (q.topic === topicName) q.topic = newName.trim();
+                  });
+                  App.saveQuestions(all);
+                  App.toast('เปลี่ยนชื่อบทแล้ว');
+                  App.render();
+                }
+              }
+            }),
+            el('button', {
+              class: 'btn btn-danger',
+              style: 'padding: 4px 8px; font-size: 0.85rem; background: transparent; color: var(--danger); border: 1px solid var(--danger);',
+              text: 'ลบทั้งบท',
+              onclick: function() {
+                if (!App.confirm('ยืนยันการลบข้อสอบทั้งหมด ' + topicsMap[topicName].count + ' ข้อ ในบท "' + topicName + '" หรือไม่?')) return;
+                var all = App.loadQuestions();
+                var progress = App.storage.getProgress();
+                var remaining = [];
+                
+                all.forEach(function(q) {
+                  if (q.topic === topicName) {
+                    delete progress[q.id]; // ลบประวัติการทำ
+                  } else {
+                    remaining.push(q);
+                  }
+                });
+                
+                App.saveQuestions(remaining);
+                App.storage.setProgress(progress);
+                App.toast('ลบบทและข้อมูลที่เกี่ยวข้องแล้ว');
+                App.render();
+              }
+            })
+          ])
+        ]);
+        topicManageWrap.appendChild(row);
+      });
+    }
+
     var subjSelect = el('select', { class: 'select' });
     subjSelect.appendChild(el('option', { value: '', text: 'ทุกวิชา' }));
     App.subjects.forEach(function (s) {
@@ -144,6 +209,7 @@
             })
           ])
         ]),
+        topicManageWrap, // แทรกกล่องจัดการบทตรงนี้
         itemsWrap
       ])
     );
@@ -293,7 +359,6 @@
     });
     diffSelect.addEventListener('change', function () { form.difficulty = parseInt(diffSelect.value, 10); });
 
-    // 🔥 สร้าง Toggle Switch สำหรับ "ห้ามสลับลำดับตัวเลือก"
     var noShuffleTrack = el('div', {
       style: 'width:44px; height:24px; border-radius:999px; background:' + (form.noShuffle ? 'var(--primary)' : 'var(--border)') + '; position:relative; transition:background 0.2s ease; flex-shrink:0;'
     });
@@ -402,7 +467,7 @@
           el('span', { class: 'label', text: 'ระดับความยาก' }),
           diffSelect
         ]),
-        el('div', { class: 'field' }, [noShuffleToggle]), // 🔥 ใช้ Toggle Switch แทน
+        el('div', { class: 'field' }, [noShuffleToggle]),
         errorBox,
         el('div', { class: 'row', style: 'margin-top:12px;' }, [
           el('button', {
@@ -614,10 +679,10 @@
     root.appendChild(
       el('div', { class: 'card' }, [
         el('h2', { text: 'ส่งออก / สำรอง' }),
-        el('div', { class: 'stack' }, [
-          exportBtn,
-          backupBtn,
-          el('div', { class: 'field' }, [
+        // แก้ไขส่วนนี้ให้ปุ่มไม่ติดกัน โดยใช้ flex-direction column และ gap
+        el('div', { style: 'display: flex; flex-direction: column; gap: 16px;' }, [
+          el('div', { style: 'display: flex; gap: 8px; flex-wrap: wrap;' }, [exportBtn, backupBtn]),
+          el('div', { class: 'field', style: 'margin: 0;' }, [
             el('span', { class: 'label', text: 'กู้คืนข้อมูลจากไฟล์สำรอง' }),
             restoreInput,
             restoreFileNameDisplay
