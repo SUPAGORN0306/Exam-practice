@@ -327,16 +327,16 @@
 
     var q = cards[currentIndex];
 
-    // 🔥 ใช้ touch-action: none เพื่อให้ swipe ทำงานบนมือถือ
     var scene = el('div', { class: 'flashcard-scene', style: 'touch-action: none;' });
     var inner = el('div', { class: 'flashcard-inner' + (flipped ? ' is-flipped' : '') });
 
+    // 🔥 ลบชื่อวิชาและบทออกจากการ์ดหน้าแรก
     var front = el('div', { class: 'flashcard-front' }, [
-      el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic }),
       el('h2', { style: 'margin-top:16px; white-space:pre-wrap;', text: q.question }),
       el('p', { class: 'muted', style: 'margin-top:32px; font-size:0.9rem;', text: 'แตะเพื่อพลิกดูเฉลย' })
     ]);
 
+    // 🔥 ลบชื่อวิชาและบทออกจากการ์ดหลัง
     var back = el('div', { class: 'flashcard-back' }, [
       el('div', { class: 'small muted', text: 'เฉลย' }),
       el('h2', { style: 'margin-top:12px; color: var(--correct);', text: q.choices[q.answer] }),
@@ -389,7 +389,6 @@
         }
       }
 
-      // 🔥 ป้องกันไม่ให้หน้าจอ scroll ตอนลากแนวนอน
       if (e.cancelable) e.preventDefault();
 
       var rotate = currentX * 0.05;
@@ -399,7 +398,6 @@
     scene.addEventListener('touchend', function () {
       if (animating) return;
       if (!isSwiping) {
-        // ไม่ใช่การปัด = ถือว่า tap (ให้ click handler จัดการ)
         inner.style.transition = '';
         inner.style.transform = '';
         return;

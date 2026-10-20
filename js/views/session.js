@@ -278,8 +278,7 @@
 
       var card = el('div', { class: 'card', style: 'margin-bottom:24px;', id: 'q-card-' + idx }, [
         el('div', { class: 'row', style: 'justify-content:space-between; margin-bottom:12px;' }, [
-          el('div', { class: 'small muted', text: 'ข้อ ' + (idx + 1) + ' / ' + s.queue.length }),
-          el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic })
+          el('div', { class: 'small muted', text: 'ข้อ ' + (idx + 1) + ' / ' + s.queue.length })
         ]),
         el('p', { style: 'font-size:var(--font-question); white-space:pre-wrap; word-break:break-word; font-weight: 600;', text: q.question })
       ]);
@@ -464,10 +463,9 @@
     });
 
     var card = el('div', { class: 'card' }, [
-      el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic }),
       el('p', { style: 'font-size:var(--font-question); white-space:pre-wrap; word-break:break-word; margin-top:8px;', text: q.question })
     ]);
-
+    
     var chosen = existing ? existing.chosen : null;
     var revealed = existing ? !!existing.confidence : false;
 
