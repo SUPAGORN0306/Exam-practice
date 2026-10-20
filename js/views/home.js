@@ -132,7 +132,7 @@
       })
     ]));
 
-    // ---- Flashcards Card (แยกออกมาเป็น Card ของตัวเอง) ----
+    // ---- Flashcards Card ----
     root.appendChild(el('div', { class: 'card' }, [
       el('div', { class: 'row-between' }, [
         el('div', { style: 'flex:1; min-width:0;' }, [
@@ -150,62 +150,88 @@
       })
     ]));
 
-    // ---- Goal + streak ----
+    // ---- Goal + streak (แก้ไขให้หยุดเมื่อถึงเป้า) ----
     var answeredToday = App.stats.dailyAnsweredCount(daily, today);
     var goal = settings.dailyGoal || 20;
-    var pct = Math.min(1, goal ? answeredToday / goal : 0);
+    
+    // 🔥 ตรวจสอบว่าถึงเป้าหมายหรือยัง
+    var isGoalMet = answeredToday >= goal;
+    var displayCount = isGoalMet ? goal : answeredToday;
+    var pct = Math.min(1, goal ? displayCount / goal : 0);
+    
     var streak = App.stats.streakDays(daily, today);
     var ringR = 34, ringC = 2 * Math.PI * ringR;
     var ring = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     ring.setAttribute('viewBox', '0 0 80 80');
     ring.setAttribute('width', '80'); ring.setAttribute('height', '80');
+    
     var bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     bgCircle.setAttribute('cx', '40'); bgCircle.setAttribute('cy', '40');
     bgCircle.setAttribute('r', String(ringR)); bgCircle.setAttribute('fill', 'none');
     bgCircle.setAttribute('stroke', 'var(--border)'); bgCircle.setAttribute('stroke-width', '8');
     ring.appendChild(bgCircle);
+    
     var fgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     fgCircle.setAttribute('cx', '40'); fgCircle.setAttribute('cy', '40');
     fgCircle.setAttribute('r', String(ringR)); fgCircle.setAttribute('fill', 'none');
-    fgCircle.setAttribute('stroke', 'var(--primary)'); fgCircle.setAttribute('stroke-width', '8');
+    // 🔥 ถ้าถึงเป้าแล้วให้เป็นสีเขียว
+    fgCircle.setAttribute('stroke', isGoalMet ? 'var(--correct)' : 'var(--primary)');
+    fgCircle.setAttribute('stroke-width', '8');
     fgCircle.setAttribute('stroke-linecap', 'round');
     fgCircle.setAttribute('stroke-dasharray', String(ringC));
     fgCircle.setAttribute('stroke-dashoffset', String(ringC * (1 - pct)));
     fgCircle.setAttribute('transform', 'rotate(-90 40 40)');
     ring.appendChild(fgCircle);
-    var ringLabel = el('div', { style: 'text-align:center; font-weight:700; margin-top:4px;', text: answeredToday + ' / ' + goal });
+    
+    var ringLabel = el('div', { 
+      style: 'text-align:center; font-weight:700; margin-top:4px; font-size: 0.95rem;',
+      text: displayCount + ' / ' + goal
+    });
 
     root.appendChild(el('div', { class: 'card' }, [
-      el('h3', { text: 'เป้าหมายรายวัน' }),
-      el('div', { class: 'row', style: 'align-items:center; gap:16px; margin-top:8px;' }, [
+      el('div', { class: 'row-between', style: 'margin-bottom: 12px;' }, [
+        el('h3', { text: 'เป้าหมายรายวัน' }),
+        el('div', { class: 'small muted', text: 'เป้าหมาย: ' + goal + ' ข้อ' })
+      ]),
+      el('div', { class: 'row', style: 'align-items:center; gap:16px;' }, [
         el('div', null, [ring, ringLabel]),
-        el('div', null, [
-          el('p', { class: 'muted small', style: 'margin:0;', text: 'ตอบไปแล้ววันนี้ ' + answeredToday + ' ข้อ' }),
-          el('p', { class: 'small', style: 'margin:6px 0 0; font-weight:600;', text: 'สตรีค ' + streak + ' วันติดกัน' })
+        el('div', { style: 'flex:1;' }, [
+          el('p', { 
+            style: 'margin:0; font-weight:600; color: ' + (isGoalMet ? 'var(--correct)' : 'var(--text)') + ';', 
+            text: isGoalMet ? 'สำเร็จแล้ว! คุณทำครบเป้าหมายแล้ว' : 'ตอบถูกไปแล้ววันนี้ ' + answeredToday + ' ข้อ' 
+          }),
+          el('p', { class: 'small', style: 'margin:6px 0 0; color:var(--muted);', text: 'สตรีค ' + streak + ' วันติดกัน' })
         ])
       ])
     ]));
 
-    // ---- Subject cards ----
+    // ---- Subject cards (แก้ไขการแสดงผล %) ----
     var subjectSection = el('div', { class: 'stack' });
-    subjectSection.appendChild(el('div', { class: 'section-title', text: 'วิชา' }));
+    subjectSection.appendChild(el('div', { class: 'section-title', text: 'ความคืบหน้ารายวิชา' }));
+    
     App.subjects.forEach(function (s) {
       var m = App.stats.subjectMastery(questions, progress, s.id);
       if (m.total === 0) return;
       var sDue = App.stats.dueTodayCount(questions, progress, today, { subject: s.id });
       var pctText = Math.round(m.pct * 100) + '%';
-      var bar = el('div', { class: 'progress-bar', style: 'margin-top:6px;' }, [
-        el('div', { class: 'fill', style: 'width:' + pctText })
+      
+      var bar = el('div', { class: 'progress-bar', style: 'margin-top:8px;' }, [
+        el('div', { class: 'fill', style: 'width:' + pctText + '; background: ' + (m.pct > 0 ? 'var(--primary)' : 'var(--border)') })
       ]);
+      
       subjectSection.appendChild(el('div', { class: 'card' }, [
         el('div', { class: 'row-between' }, [
           el('div', { style: 'flex:1; min-width:0;' }, [
             el('h3', { text: s.name }),
-            el('div', { class: 'muted small', text: 'จำได้แล้ว ' + pctText + ' (' + m.mastered + ' / ' + m.total + ' ข้อ)' }),
+            el('div', { class: 'muted small', style: 'margin-top: 4px;', text: 'ความแม่นยำ ' + pctText + ' (' + m.mastered + ' จาก ' + m.total + ' ข้อ)' }),
             bar,
-            el('div', { class: 'muted small', style: 'margin-top:6px;', text: 'ค้างทบทวน ' + sDue + ' ข้อ' })
+            el('div', { class: 'muted small', style: 'margin-top:8px;', text: 'ค้างทบทวน ' + sDue + ' ข้อ' })
           ]),
-          el('button', { class: 'btn btn-primary', text: 'ฝึก', onclick: function () { openSubjectSheet(s, questions, progress, chosenN); } })
+          el('button', { 
+            class: 'btn btn-primary', 
+            text: 'ฝึก', 
+            onclick: function () { openSubjectSheet(s, questions, progress, chosenN); } 
+          })
         ])
       ]));
     });
@@ -242,7 +268,6 @@
     var selectedTopic = '';
     var n = chosenN;
     
-    // 🔥 ล็อค Scroll ด้านหลัง
     document.body.style.overflow = 'hidden';
 
     var overlay = el('div', {
@@ -256,7 +281,6 @@
       style: 'position:fixed; left:0; right:0; bottom:0; background:var(--surface); border-radius:20px 20px 0 0; padding:20px; padding-bottom: calc(20px + env(safe-area-inset-bottom)); z-index:51; max-height:80vh; overflow-y:auto;'
     });
 
-    // 🔥 Header ของ Sheet + ปุ่มปิด
     sheet.appendChild(el('div', { class: 'row-between', style: 'margin-bottom:16px;' }, [
       el('h2', { text: 'ฝึก ' + subject.name, style: 'margin:0;' }),
       el('button', { class: 'icon-btn', text: '✕', 'aria-label': 'ปิด', onclick: closeSheet })
@@ -303,7 +327,7 @@
     document.body.appendChild(overlay);
 
     function closeSheet() {
-      document.body.style.overflow = ''; // คืนค่า Scroll
+      document.body.style.overflow = '';
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
     }
   }

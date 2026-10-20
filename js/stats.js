@@ -19,6 +19,7 @@
     var day = String(d.getDate()).padStart(2, '0');
     return y + '-' + m + '-' + day;
   }
+  
   function dailyAnsweredCount(daily, dayKey) {
     var d = daily[dayKey];
     if (!d) return 0;
@@ -30,6 +31,7 @@
     });
     return total;
   }
+
   function streakDays(daily, todayK) {
     var t = todayK || todayKey();
     var count = 0;
@@ -46,16 +48,19 @@
     }
     return count;
   }
+
+  // 🔥 แก้ไข: ให้ความแม่นยำขยับตั้งแต่เริ่มทำ (box >= 2 ถือว่าเริ่มจำได้)
   function subjectMastery(questions, progress, subject) {
     var total = 0, mastered = 0;
     questions.forEach(function (q) {
       if (q.subject !== subject) return;
       total++;
       var p = progress[q.id];
-      if (p && (p.box || 0) >= 4) mastered++;
+      if (p && (p.box || 0) >= 2) mastered++;
     });
     return { total: total, mastered: mastered, pct: total ? mastered / total : 0 };
   }
+
   function dueTodayCount(questions, progress, todayK, filter) {
     filter = filter || {};
     var t = todayK || todayKey();
@@ -67,6 +72,7 @@
     });
     return n;
   }
+
   function dueTomorrowCount(questions, progress, todayK, filter) {
     filter = filter || {};
     var t = todayK || todayKey();
@@ -79,6 +85,7 @@
     });
     return n;
   }
+
   function slowQuestions(subject, progress, questions) {
     var times = [];
     questions.forEach(function (q) {
@@ -107,30 +114,26 @@
     return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
   }
 
-  // --- Round 3: extra helpers ---
   function overallCounts(questions, progress) {
     var total = questions.length;
     var mastered = 0, learning = 0, untouched = 0;
     questions.forEach(function (q) {
       var p = progress[q.id];
       if (!p) untouched++;
-      else if ((p.box || 0) >= 4) mastered++;
+      else if ((p.box || 0) >= 4) mastered++; // ในหน้าสถิติใช้ >=4 เหมือนเดิม
       else learning++;
     });
     return { total: total, mastered: mastered, learning: learning, untouched: untouched };
   }
 
-  // 30-day daily accuracy per subject
-  // Returns { days: [ 'YYYY-MM-DD', ...], series: { subject: [ {answered, correct} ] } }
   function dailyAccuracy30(questions, progress, sessions, subjectList, todayK) {
     var t = todayK || todayKey();
     var days = [];
     for (var i = 29; i >= 0; i--) days.push(App.scheduler.addDays(t, -i));
 
-    // Build per-subject map: session -> day
     var byId = {};
     questions.forEach(function (q) { byId[q.id] = q; });
-    var daily = {}; // { dayKey: { subject: {n, correct} } }
+    var daily = {};
     days.forEach(function (d) { daily[d] = {}; });
 
     sessions.forEach(function (s) {
@@ -159,7 +162,6 @@
   }
 
   function topicAccuracyList(questions, progress, topicRecent) {
-    // Returns per subject: array of { topic, accuracy|null, n }
     var bySubject = {};
     questions.forEach(function (q) {
       bySubject[q.subject] = bySubject[q.subject] || {};
@@ -199,7 +201,6 @@
     dueTomorrowCount: dueTomorrowCount,
     slowQuestions: slowQuestions,
     median: median,
-
     overallCounts: overallCounts,
     dailyAccuracy30: dailyAccuracy30,
     topicAccuracyList: topicAccuracyList,
