@@ -60,7 +60,6 @@
     var el = App.el;
     var questions = App.loadQuestions();
 
-    // Filters
     var subjSelect = el('select', { class: 'select' });
     subjSelect.appendChild(el('option', { value: '', text: 'ทุกวิชา' }));
     App.subjects.forEach(function (s) {
@@ -178,7 +177,6 @@
       });
     }
 
-    // Subject
     var subjSelect = el('select', { class: 'select' });
     App.subjects.forEach(function (s) {
       var opt = el('option', { value: s.id, text: s.name });
@@ -195,7 +193,6 @@
     qInput.value = form.question;
     qInput.addEventListener('input', function () { form.question = qInput.value; });
 
-    // Choices
     var choicesWrap = el('div');
     var whyWrongWrap = el('div', { style: 'margin-top:8px;' });
 
@@ -240,7 +237,6 @@
         }
         choicesWrap.appendChild(row);
 
-        // whyWrong input
         if (form.whyWrong) {
           if (i === form.answer) {
             whyWrongWrap.appendChild(el('div', { class: 'small muted', text: LETTERS[i] + ': (คำตอบที่ถูก — ไม่ต้องกรอก)' }));
@@ -297,13 +293,33 @@
     });
     diffSelect.addEventListener('change', function () { form.difficulty = parseInt(diffSelect.value, 10); });
 
-    var noShuffleCb = el('input', { type: 'checkbox' });
-    noShuffleCb.checked = form.noShuffle;
-    noShuffleCb.addEventListener('change', function () { form.noShuffle = noShuffleCb.checked; });
-    var noShuffleLabel = el('label', { class: 'row' }, [
-      noShuffleCb,
-      el('span', { text: ' ห้ามสลับลำดับตัวเลือก' })
-    ]);
+    // 🔥 สร้าง Toggle Switch สำหรับ "ห้ามสลับลำดับตัวเลือก"
+    var noShuffleTrack = el('div', {
+      style: 'width:44px; height:24px; border-radius:999px; background:' + (form.noShuffle ? 'var(--primary)' : 'var(--border)') + '; position:relative; transition:background 0.2s ease; flex-shrink:0;'
+    });
+    var noShuffleKnob = el('div', {
+      style: 'width:20px; height:20px; border-radius:50%; background:#fff; position:absolute; top:2px; left:2px; transition:transform 0.2s ease; box-shadow:0 1px 3px rgba(0,0,0,0.2); transform:' + (form.noShuffle ? 'translateX(20px)' : 'translateX(0)') + ';'
+    });
+    noShuffleTrack.appendChild(noShuffleKnob);
+
+    var noShuffleToggle = el('div', {
+      style: 'display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; cursor:pointer;',
+      onclick: function () {
+        form.noShuffle = !form.noShuffle;
+        if (form.noShuffle) {
+          noShuffleKnob.style.transform = 'translateX(20px)';
+          noShuffleTrack.style.background = 'var(--primary)';
+        } else {
+          noShuffleKnob.style.transform = 'translateX(0)';
+          noShuffleTrack.style.background = 'var(--border)';
+        }
+      }
+    });
+    noShuffleToggle.appendChild(el('div', null, [
+      el('div', { style: 'font-weight:600; font-size:0.95rem;', text: 'ห้ามสลับลำดับตัวเลือก' }),
+      el('div', { class: 'small muted', style: 'margin-top:2px;', text: 'ใช้เมื่อตัวเลือกต้องเรียงตามลำดับ' })
+    ]));
+    noShuffleToggle.appendChild(noShuffleTrack);
 
     function save(thenNext) {
       var payload = {
@@ -329,11 +345,9 @@
 
       var all = App.loadQuestions();
       if (form.id) {
-        // Edit existing
         var idx = all.findIndex(function (q) { return q.id === form.id; });
         if (idx >= 0) {
           var oldQ = all[idx];
-          // Warn if answer position changed and progress exists
           var progress = App.storage.getProgress();
           if (progress[form.id] && oldQ.answer !== payload.answer) {
             if (!App.confirm('ประวัติการทำของข้อนี้จะยังคงอยู่ ตรวจสอบเฉลยให้ถูกต้อง บันทึกต่อหรือไม่?')) return;
@@ -351,7 +365,6 @@
       App.toast('บันทึกแล้ว');
 
       if (thenNext) {
-        // Keep subject/topic, clear the rest
         form.question = '';
         form.choices = ['', '', '', ''];
         form.answer = -1;
@@ -389,7 +402,7 @@
           el('span', { class: 'label', text: 'ระดับความยาก' }),
           diffSelect
         ]),
-        el('div', { class: 'field' }, [noShuffleLabel]),
+        el('div', { class: 'field' }, [noShuffleToggle]), // 🔥 ใช้ Toggle Switch แทน
         errorBox,
         el('div', { class: 'row', style: 'margin-top:12px;' }, [
           el('button', {
@@ -428,16 +441,32 @@
   function renderImport(root) {
     var el = App.el;
 
-    // Import via file or paste
+    function createFileInput(onLoad, label) {
+      var fileInput = el('input', { type: 'file', accept: '.json,application/json', style: 'display:none;' });
+      var btn = el('button', {
+        class: 'btn btn-block',
+        text: label || 'เลือกไฟล์ .json',
+        type: 'button',
+        onclick: function () { fileInput.click(); }
+      });
+      fileInput.addEventListener('change', function () {
+        var f = fileInput.files && fileInput.files[0];
+        if (!f) return;
+        var reader = new FileReader();
+        reader.onload = function () { onLoad(String(reader.result || ''), f.name); };
+        reader.readAsText(f);
+      });
+      return el('div', null, [fileInput, btn]);
+    }
+
     var pasteArea = el('textarea', { class: 'textarea', placeholder: 'วาง JSON ที่นี่' });
-    var fileInput = el('input', { type: 'file', accept: '.json,application/json' });
-    fileInput.addEventListener('change', function () {
-      var f = fileInput.files && fileInput.files[0];
-      if (!f) return;
-      var reader = new FileReader();
-      reader.onload = function () { pasteArea.value = String(reader.result || ''); };
-      reader.readAsText(f);
-    });
+    var fileNameDisplay = el('div', { class: 'small muted', style: 'margin-top:8px;', text: 'ยังไม่ได้เลือกไฟล์' });
+
+    var fileSelectBtn = createFileInput(function (text, name) {
+      pasteArea.value = text;
+      fileNameDisplay.textContent = 'ไฟล์ที่เลือก: ' + name;
+      doValidate();
+    }, 'เลือกไฟล์ .json');
 
     var previewBox = el('div', { style: 'margin-top:12px;' });
 
@@ -511,7 +540,9 @@
       text: 'คัดลอกพรอมต์สำหรับให้ AI ร่างข้อสอบ',
       onclick: function () {
         App.askai.copyText(App.askai.PROMPT_TEMPLATE).then(
-          function () { App.toast('คัดลอกพรอมต์แล้ว'); },
+          function () { 
+            App.toast('คัดลอกพรอมต์แล้ว — เอาไปวางใน Claude/ChatGPT แล้วแนบไฟล์เนื้อหาให้ AI'); 
+          },
           function () { App.toast('คัดลอกไม่สำเร็จ'); }
         );
       }
@@ -551,28 +582,24 @@
       }
     });
 
-    var restoreInput = el('input', { type: 'file', accept: '.json,application/json' });
-    restoreInput.addEventListener('change', function () {
-      var f = restoreInput.files && restoreInput.files[0];
-      if (!f) return;
-      var reader = new FileReader();
-      reader.onload = function () {
-        try {
-          var data = JSON.parse(String(reader.result || ''));
-          restoreFrom(data);
-        } catch (e) {
-          alert('อ่านไฟล์ไม่สำเร็จ: ' + e.message);
-        }
-      };
-      reader.readAsText(f);
-    });
+    var restoreFileNameDisplay = el('div', { class: 'small muted', style: 'margin-top:8px;', text: 'ยังไม่ได้เลือกไฟล์' });
+    var restoreInput = createFileInput(function (text, name) {
+      restoreFileNameDisplay.textContent = 'ไฟล์ที่เลือก: ' + name;
+      try {
+        var data = JSON.parse(text);
+        restoreFrom(data);
+      } catch (e) {
+        alert('อ่านไฟล์ไม่สำเร็จ: ' + e.message);
+      }
+    }, 'เลือกไฟล์สำรองเพื่อกู้คืน');
 
     root.appendChild(
       el('div', { class: 'card' }, [
         el('h2', { text: 'นำเข้าข้อสอบ' }),
         el('div', { class: 'field' }, [
           el('span', { class: 'label', text: 'เลือกไฟล์ .json' }),
-          fileInput
+          fileSelectBtn,
+          fileNameDisplay
         ]),
         el('div', { class: 'field' }, [
           el('span', { class: 'label', text: 'หรือวาง JSON' }),
@@ -592,7 +619,8 @@
           backupBtn,
           el('div', { class: 'field' }, [
             el('span', { class: 'label', text: 'กู้คืนข้อมูลจากไฟล์สำรอง' }),
-            restoreInput
+            restoreInput,
+            restoreFileNameDisplay
           ])
         ])
       ])
@@ -650,7 +678,6 @@
       App.toast('กู้คืนแล้ว');
       App.render();
     } else if (mode === 'รวม') {
-      // Merge: skip duplicate ids
       var existing = App.loadQuestions();
       var ids = {};
       existing.forEach(function (q) { if (q.id) ids[q.id] = true; });
