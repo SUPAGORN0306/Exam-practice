@@ -1,4 +1,4 @@
-/* Session view — Free Navigation, continuous timer, unified UI, submit */
+/* Session view — Free Navigation, continuous timer, unified UI, submit, grid navigator */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -39,7 +39,7 @@
     if (s) { s.timer.elapsedMs = sessionElapsedMs; App.storage.setActiveSession(s); }
   }
 
-  function startTick(session, elapsedEl) {
+  function startTick(session, elapsedEl, onTick) {
     clearTimer();
     timerInterval = setInterval(function () {
       if (hiddenAt) return;
@@ -49,12 +49,12 @@
         showOvertimeModal(session);
       }
       if (elapsedEl) elapsedEl.textContent = formatMs(sessionElapsedMs);
+      if (onTick) onTick();
       if (sessionElapsedMs - lastSaveMs >= 5000) { lastSaveMs = sessionElapsedMs; saveElapsed(); }
     }, 1000);
   }
 
-  // 🔥 นับจำนวนข้อที่ "ตอบแล้ว" (แค่เลือกข้อ ไม่ต้องดูเฉลย)
-  function getAnsweredCount(session) {
+  function countAnswered(session) {
     return session.queue.filter(function (cur) {
       return session.answers.some(function (a) { 
         return a.qid === cur.qid && String(a.isRecheck) === String(cur.isRecheck) && a.chosen != null; 
@@ -62,12 +62,19 @@
     }).length;
   }
 
-  function getUnansweredCount(session) {
-    return session.queue.filter(function (cur) {
-      return !session.answers.some(function (a) { 
+  function countUnanswered(session) {
+    return session.queue.length - countAnswered(session);
+  }
+
+  function getUnansweredList(session) {
+    var list = [];
+    session.queue.forEach(function (cur, idx) {
+      var hasAnswer = session.answers.some(function (a) { 
         return a.qid === cur.qid && String(a.isRecheck) === String(cur.isRecheck) && a.chosen != null; 
       });
-    }).length;
+      if (!hasAnswer) list.push(idx + 1);
+    });
+    return list;
   }
 
   function startNew(ids, meta) {
@@ -145,6 +152,70 @@
   }
 
   // ==========================================
+  // 🔥 ฟังก์ชันสร้าง Grid Navigator (ใช้ร่วมกันทั้ง 2 โหมด)
+  // ==========================================
+  function openGridNavigator(session, onSelect) {
+    var el = App.el;
+    var overlay = el('div', {
+      style: 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:60; display:flex; align-items:flex-end; justify-content:flex-start;',
+      onclick: function (e) {
+        if (e.target === overlay) closeGrid();
+      }
+    });
+
+    var panel = el('div', {
+      style: 'position:absolute; bottom:90px; left:16px; background:var(--surface); border-radius:16px; padding:16px; z-index:61; max-width:280px; max-height:60vh; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,0.2);'
+    });
+
+    panel.appendChild(el('h4', { style: 'margin: 0 0 12px; font-size: 0.95rem;', text: 'ผังข้อสอบ' }));
+    
+    // Legend
+    panel.appendChild(el('div', { class: 'row', style: 'gap:12px; margin-bottom:12px; font-size:0.75rem;' }, [
+      el('div', { class: 'row', style: 'gap:4px;' }, [
+        el('div', { style: 'width:12px; height:12px; background:var(--correct); border-radius:3px;' }),
+        el('span', { class: 'muted', text: 'ตอบแล้ว' })
+      ]),
+      el('div', { class: 'row', style: 'gap:4px;' }, [
+        el('div', { style: 'width:12px; height:12px; background:var(--wrong); border-radius:3px;' }),
+        el('span', { class: 'muted', text: 'ยังไม่ได้ตอบ' })
+      ])
+    ]));
+
+    // Grid
+    var grid = el('div', { style: 'display:grid; grid-template-columns: repeat(5, 1fr); gap:6px;' });
+    
+    session.queue.forEach(function (cur, idx) {
+      var answered = session.answers.some(function (a) { 
+        return a.qid === cur.qid && String(a.isRecheck) === String(cur.isRecheck) && a.chosen != null; 
+      });
+      var isCurrent = (session.index === idx);
+      
+      var cell = el('button', {
+        type: 'button',
+        style: 'width:40px; height:40px; border-radius:8px; border:none; font-weight:700; font-size:0.85rem; cursor:pointer; ' +
+               'background: ' + (answered ? 'var(--correct)' : 'var(--wrong)') + '; ' +
+               'color: white; ' +
+               'outline: ' + (isCurrent ? '3px solid var(--primary)' : 'none') + '; ' +
+               'outline-offset: 2px;',
+        text: String(idx + 1),
+        onclick: function () {
+          closeGrid();
+          onSelect(idx);
+        }
+      });
+      grid.appendChild(cell);
+    });
+    
+    panel.appendChild(grid);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    function closeGrid() {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+  }
+
+  // ==========================================
   // 🔥 โหมด Scroll
   // ==========================================
   function renderScrollMode(root, session) {
@@ -154,8 +225,7 @@
     var isTimed = s.timer.mode === 'timed';
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs) });
 
-    var answeredCount = getAnsweredCount(s);
-    var answeredCounterEl = el('div', { class: 'small muted', style: 'white-space:nowrap;', text: answeredCount + ' / ' + s.queue.length });
+    var answeredCounterEl = el('div', { class: 'small muted', style: 'white-space:nowrap;', text: countAnswered(s) + ' / ' + s.queue.length });
 
     var progressFill = el('div', { class: 'fill', style: 'width:0%' });
     var progressBarEl = isTimed ? el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [progressFill]) : null;
@@ -198,7 +268,7 @@
       });
       var revealedAlready = !!(existing && existing.confidence); 
 
-      var card = el('div', { class: 'card', style: 'margin-bottom:24px;' }, [
+      var card = el('div', { class: 'card', style: 'margin-bottom:24px;', id: 'q-card-' + idx }, [
         el('div', { class: 'row', style: 'justify-content:space-between; margin-bottom:12px;' }, [
           el('div', { class: 'small muted', text: 'ข้อ ' + (idx + 1) + ' / ' + s.queue.length }),
           el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic })
@@ -232,8 +302,7 @@
 
             existing = { qid: q.id, chosen: origIdx, confidence: null, isRecheck: cq.isRecheck, correct: null };
 
-            // 🔥 อัปเดตตัวเลขทันที
-            answeredCounterEl.textContent = getAnsweredCount(App.storage.getActiveSession()) + ' / ' + activeS.queue.length;
+            answeredCounterEl.textContent = countAnswered(activeS) + ' / ' + activeS.queue.length;
           }
         });
         btn.appendChild(el('span', { class: 'choice-tag', text: LETTERS[displayIdx] }));
@@ -259,11 +328,14 @@
         text: 'ส่งคำตอบ',
         onclick: function () {
           var activeS = App.storage.getActiveSession();
-          var unanswered = getUnansweredCount(activeS);
+          var unansweredList = getUnansweredList(activeS);
           
-          var msg = unanswered > 0
-            ? 'ยังไม่ได้ตอบ ' + unanswered + ' ข้อ ต้องการส่งคำตอบเลยหรือไม่?'
-            : 'ต้องการส่งคำตอบทั้งหมดเลยหรือไม่?';
+          var msg;
+          if (unansweredList.length > 0) {
+            msg = 'คุณยังไม่ได้ตอบข้อ: ' + unansweredList.join(', ') + '\n\nต้องการส่งคำตอบเลยหรือไม่? (ข้อที่ไม่ได้ตอบจะถูกนับว่าผิด)';
+          } else {
+            msg = 'คุณตอบครบทุกข้อแล้ว ต้องการส่งคำตอบหรือไม่?';
+          }
           if (!App.confirm(msg)) return;
 
           clearTimer();
@@ -304,6 +376,22 @@
       })
     ]);
     root.appendChild(submitWrap);
+
+    // 🔥 ปุ่ม Grid Navigator (มุมล่างซ้าย)
+    root.appendChild(el('button', {
+      class: 'icon-btn',
+      style: 'position:fixed; bottom:90px; left:16px; z-index:55; width:56px; height:56px; border-radius:50%; box-shadow:0 4px 12px rgba(0,0,0,0.2); background:var(--primary); color:var(--primary-contrast); border:none;',
+      'aria-label': 'เปิดผังข้อสอบ',
+      text: '▦',
+      onclick: function () {
+        openGridNavigator(s, function (idx) {
+          var targetCard = document.getElementById('q-card-' + idx);
+          if (targetCard) {
+            targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      }
+    }));
   }
 
   // ==========================================
@@ -330,9 +418,7 @@
     var isTimed = s.timer.mode === 'timed';
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs) });
 
-    // 🔥 จำนวนข้อที่ตอบแล้ว / ทั้งหมด
-    var answeredCount = getAnsweredCount(s);
-    var answeredCounterEl = el('div', { class: 'small muted', style: 'white-space:nowrap;', text: answeredCount + ' / ' + s.queue.length });
+    var answeredCounterEl = el('div', { class: 'small muted', style: 'white-space:nowrap;', text: countAnswered(s) + ' / ' + s.queue.length });
 
     var progressFill = el('div', { class: 'fill', style: 'width:0%' });
     var progressBarEl = isTimed ? el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [progressFill]) : null;
@@ -395,8 +481,7 @@
           }
           App.storage.setActiveSession(activeS);
 
-          // 🔥 อัปเดตจำนวนข้อทันที
-          answeredCounterEl.textContent = getAnsweredCount(activeS) + ' / ' + activeS.queue.length;
+          answeredCounterEl.textContent = countAnswered(activeS) + ' / ' + activeS.queue.length;
 
           choicesWrap.querySelectorAll('.choice-btn').forEach(function (b, i) {
             b.classList.toggle('selected', order[i] === chosen);
@@ -465,19 +550,40 @@
           style: 'height:56px; padding: 0 24px;', 
           text: 'ส่งคำตอบ', 
           onclick: function () { 
-            var unanswered = getUnansweredCount(s);
-            var msg = unanswered > 0
-              ? 'ยังไม่ได้ตอบ ' + unanswered + ' ข้อ ต้องการส่งคำตอบเลยหรือไม่?'
-              : 'ต้องการส่งคำตอบทั้งหมดเลยหรือไม่?';
+            var activeS = App.storage.getActiveSession();
+            var unansweredList = getUnansweredList(activeS);
+            
+            var msg;
+            if (unansweredList.length > 0) {
+              msg = 'คุณยังไม่ได้ตอบข้อ: ' + unansweredList.join(', ') + '\n\nต้องการส่งคำตอบเลยหรือไม่? (ข้อที่ไม่ได้ตอบจะถูกนับว่าผิด)';
+            } else {
+              msg = 'คุณตอบครบทุกข้อแล้ว ต้องการส่งคำตอบหรือไม่?';
+            }
             if (!App.confirm(msg)) return;
 
             clearTimer(); 
-            finishSession(s); 
+            finishSession(activeS); 
           } 
         })
         :
         el('button', { class: 'icon-btn', 'aria-label': 'ข้อถัดไป', text: '>', style: 'width:56px; height:56px; font-size:1.5rem;', onclick: function () { goNext(s); } })
     ]));
+
+    // 🔥 ปุ่ม Grid Navigator (มุมล่างซ้าย)
+    root.appendChild(el('button', {
+      class: 'icon-btn',
+      style: 'position:fixed; bottom:90px; left:16px; z-index:55; width:56px; height:56px; border-radius:50%; box-shadow:0 4px 12px rgba(0,0,0,0.2); background:var(--primary); color:var(--primary-contrast); border:none;',
+      'aria-label': 'เปิดผังข้อสอบ',
+      text: '▦',
+      onclick: function () {
+        openGridNavigator(s, function (idx) {
+          s.index = idx;
+          s.timer.elapsedMs = sessionElapsedMs;
+          App.storage.setActiveSession(s);
+          App.render();
+        });
+      }
+    }));
   }
 
   function commitAnswer(confidence, q, chosen) {
