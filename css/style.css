@@ -357,6 +357,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   perspective: 1000px;
   margin-top: 12px;
   position: relative;
+  touch-action: none !important; /* 🔥 บังคับให้ swipe แนวนอนทำงานบนมือถือ */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .flashcard-inner {
@@ -580,16 +583,15 @@ html[data-theme='dark'] .choice-btn.wrong {
   border-radius: var(--radius-md) !important;
   margin-bottom: 12px !important;
 }
-*/
-/* 🔥 บังคับให้การ์ดยอมให้ปัดบนมือถือแบบไม่ติดขัด */
-.flashcard-scene, 
+
+/* .flashcard-scene, 
 .flashcard-inner,
 .flashcard-front, 
 .flashcard-back {
-  touch-action: pan-y !important; /* ให้มันสกอลล์ขึ้นลงได้ แต่ให้ JS จัดการแนวนอน */
-  -webkit-user-select: none; /* กันการคลุมดำข้อความ */
+  touch-action: pan-y !important; 
+  -webkit-user-select: none; 
   user-select: none;
-}
+} */
 
 /* ซ่อน scrollbar ของการ์ดเพื่อไม่ให้มันแย่งพื้นที่ */
 .flashcard-front::-webkit-scrollbar, 
