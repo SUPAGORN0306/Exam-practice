@@ -1,4 +1,4 @@
-/* Flashcards mode — 3D Flip, Swipe (no hints), Arrow Navigation */
+/* Flashcards mode — Swipe (Leitner) + Arrow Navigation (Loop) + Random */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -38,7 +38,7 @@
     var selectedChapters = selection.chapters.slice();
     var selectedLimit = selection.limit;
 
-    var chapterContainer = el('div', { id: 'fc-chapter-container' });
+    var chapterContainer = el('div', { id: 'fc-chapter-container', style: 'display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;' });
     var limitContainer = el('div', { id: 'fc-limit-container', class: 'row', style: 'gap:8px; flex-wrap:wrap;' });
     var poolInfo = el('p', { class: 'muted small', style: 'margin-top:8px;' });
 
@@ -77,11 +77,11 @@
             el('button', {
               class: 'btn btn-small', type: 'button', text: 'เลือกทั้งหมด',
               onclick: function () {
-                var boxes = chapterContainer.querySelectorAll('input[type=checkbox]');
                 selectedChapters = [];
-                for (var i = 0; i < boxes.length; i++) {
-                  boxes[i].checked = true;
-                  selectedChapters.push(boxes[i].value);
+                var chips = chapterContainer.querySelectorAll('.chip');
+                for (var i = 0; i < chips.length; i++) {
+                  chips[i].classList.add('selected');
+                  selectedChapters.push(chips[i].getAttribute('data-topic'));
                 }
                 selection.chapters = selectedChapters.slice();
                 updatePoolInfo();
@@ -90,8 +90,8 @@
             el('button', {
               class: 'btn btn-small', type: 'button', text: 'ล้าง',
               onclick: function () {
-                var boxes = chapterContainer.querySelectorAll('input[type=checkbox]');
-                for (var i = 0; i < boxes.length; i++) boxes[i].checked = false;
+                var chips = chapterContainer.querySelectorAll('.chip');
+                for (var i = 0; i < chips.length; i++) chips[i].classList.remove('selected');
                 selectedChapters = [];
                 selection.chapters = [];
                 updatePoolInfo();
@@ -147,29 +147,29 @@
         return;
       }
 
-      topicNames.forEach(function (t, idx) {
-        var id = 'fc-ch-' + idx + '-' + t.replace(/\s+/g, '_');
-        var cb = el('input', { type: 'checkbox', id: id, value: t });
-        if (selectedChapters.indexOf(t) !== -1) cb.checked = true;
+      topicNames.forEach(function (t) {
+        // 🔥 ใช้ .chip แทน checkbox
+        var isSel = selectedChapters.indexOf(t) !== -1;
+        var chip = el('div', { 
+          class: 'chip' + (isSel ? ' selected' : ''),
+          'data-topic': t,
+          text: t + ' (' + topics[t] + ')'
+        });
 
-        cb.addEventListener('change', function () {
-          if (cb.checked) {
-            if (selectedChapters.indexOf(t) === -1) selectedChapters.push(t);
-          } else {
+        chip.addEventListener('click', function () {
+          if (chip.classList.contains('selected')) {
+            chip.classList.remove('selected');
             var i = selectedChapters.indexOf(t);
             if (i !== -1) selectedChapters.splice(i, 1);
+          } else {
+            chip.classList.add('selected');
+            if (selectedChapters.indexOf(t) === -1) selectedChapters.push(t);
           }
           selection.chapters = selectedChapters.slice();
           updatePoolInfo();
         });
 
-        chapterContainer.appendChild(el('div', {
-          class: 'check-row',
-          style: 'display:flex; align-items:center; gap:10px; padding:8px 0;'
-        }, [
-          cb,
-          el('label', { for: id, style: 'flex:1; cursor:pointer;', text: t + ' (' + topics[t] + ' ข้อ)' })
-        ]));
+        chapterContainer.appendChild(chip);
       });
     }
 
@@ -266,29 +266,15 @@
     var el = App.el;
     while (root.firstChild) root.removeChild(root.firstChild);
 
-    // Top bar
+    // 🔥 Header แบบมินิมอล: แค่ปุ่มออก ไม่มี Progress bar ให้กดดัน
     root.appendChild(el('div', {
       class: 'session-top',
-      style: 'display:flex; align-items:center; gap:12px; margin-bottom:16px;'
+      style: 'display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;'
     }, [
       el('button', { class: 'icon-btn', text: '✕', onclick: function () { App.navigate('home'); } }),
-      el('div', { class: 'small muted', style: 'white-space:nowrap;', text: (currentIndex + 1) + ' / ' + cards.length }),
-      el('div', { class: 'progress-bar', style: 'flex:1; margin:0 8px;' }, [
-        el('div', { class: 'fill', style: 'width:' + Math.round((currentIndex / cards.length) * 100) + '%' })
-      ])
+      el('div', { class: 'small muted', style: 'font-weight:600;', text: 'โหมดทบทวน' }),
+      el('div', { style: 'width:48px;' }) // ดันให้ปุ่ม X อยู่ซ้าย และข้อความอยู่กลาง
     ]));
-
-    if (currentIndex >= cards.length) {
-      root.appendChild(el('div', { class: 'card center' }, [
-        el('h2', { text: 'จบชุดแฟลชการ์ด' }),
-        el('p', { class: 'muted', text: 'ทบทวนครบ ' + cards.length + ' ใบแล้ว' }),
-        el('div', { class: 'row', style: 'justify-content:center; margin-top:16px;' }, [
-          el('button', { class: 'btn', text: 'เลือกหมวดใหม่', onclick: function () { App.views.flashcards(root); } }),
-          el('button', { class: 'btn btn-primary', text: 'กลับหน้าแรก', onclick: function () { App.navigate('home'); } })
-        ])
-      ]));
-      return;
-    }
 
     var q = cards[currentIndex];
 
@@ -314,8 +300,6 @@
     inner.appendChild(back);
     scene.appendChild(inner);
     root.appendChild(scene);
-
-    // 🔥 ไม่มี Hint (จำได้/จำไม่ได้) แล้ว
 
     var isDragging = false;
 
@@ -375,29 +359,46 @@
       currentX = 0; currentY = 0;
     });
 
-    // 🔥 ปุ่มลูกศร < > (สำหรับคนไม่สะดวกปัด)
-    root.appendChild(el('div', { class: 'row', style: 'margin-top:24px; justify-content:center; gap:24px;' }, [
+    // 🔥 ปุ่มควบคุม: [ < ] [ สุ่มข้อ ] [ > ] (ใช้ class btn ปกติ ไม่ให้ลูกศรหาย)
+    root.appendChild(el('div', { class: 'row', style: 'margin-top:24px; justify-content:center; gap:16px;' }, [
+      
+      // ย้อนกลับ
       el('button', { 
         class: 'icon-btn', 
-        style: 'width:56px; height:56px; font-size:1.5rem;',
-        'aria-label': 'ข้อก่อนหน้า',
+        style: 'width:48px; height:48px; font-size:1.5rem;',
         text: '<',
-        disabled: currentIndex === 0,
         onclick: function () {
-          if (currentIndex > 0) {
-            currentIndex--;
-            flipped = false;
-            renderCard(root);
-          }
+          currentIndex = (currentIndex - 1 + cards.length) % cards.length; // วนลูป
+          flipped = false;
+          renderCard(root);
         }
       }),
+
+      // สุ่มข้อ
       el('button', { 
-        class: 'icon-btn btn-primary', 
-        style: 'width:56px; height:56px; font-size:1.5rem; border:none;',
-        'aria-label': 'ข้อถัดไป',
+        class: 'btn',
+        style: 'min-width:100px;',
+        text: 'สุ่มข้อ',
+        onclick: function () {
+          if (cards.length <= 1) return;
+          var nextIdx;
+          do {
+            nextIdx = Math.floor(Math.random() * cards.length);
+          } while (nextIdx === currentIndex);
+          
+          currentIndex = nextIdx;
+          flipped = false;
+          renderCard(root);
+        }
+      }),
+
+      // ไปข้างหน้า
+      el('button', { 
+        class: 'icon-btn', 
+        style: 'width:48px; height:48px; font-size:1.5rem;',
         text: '>',
         onclick: function () {
-          currentIndex++;
+          currentIndex = (currentIndex + 1) % cards.length; // วนลูป
           flipped = false;
           renderCard(root);
         }
@@ -416,9 +417,21 @@
     inner.classList.add(direction === 'left' ? 'swipe-left' : 'swipe-right');
 
     setTimeout(function () {
-      // ปัดซ้าย/ขวา = บันทึก Leitner ตามปกติ
+      // 🔥 ปัดซ้าย/ขวา = บันทึก Leitner (จำได้/จำไม่ได้)
       updateBox(q, direction === 'right');
-      currentIndex++;
+ 
+      cards.splice(currentIndex, 1);
+      
+      if (cards.length === 0) {
+        App.toast('ทบทวนครบทุกใบแล้ว');
+        App.views.flashcards(root);
+        return;
+      }
+
+      if (currentIndex >= cards.length) {
+        currentIndex = 0; // วนกลับไปเริ่ม
+      }
+      
       flipped = false;
       renderCard(root);
     }, 380);
