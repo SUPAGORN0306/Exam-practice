@@ -1,4 +1,4 @@
-/* Flashcards mode — 3D Flip, Swipe, Subject/Topic Multi-select + Limit */
+/* Flashcards mode — 3D Flip, Swipe (no hints), Arrow Navigation */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -266,6 +266,7 @@
     var el = App.el;
     while (root.firstChild) root.removeChild(root.firstChild);
 
+    // Top bar
     root.appendChild(el('div', {
       class: 'session-top',
       style: 'display:flex; align-items:center; gap:12px; margin-bottom:16px;'
@@ -314,10 +315,7 @@
     scene.appendChild(inner);
     root.appendChild(scene);
 
-    var hintLeft = el('div', { class: 'swipe-hint hint-left', text: 'จำไม่ได้' });
-    var hintRight = el('div', { class: 'swipe-hint hint-right', text: 'จำได้' });
-    scene.appendChild(hintLeft);
-    scene.appendChild(hintRight);
+    // 🔥 ไม่มี Hint (จำได้/จำไม่ได้) แล้ว
 
     var isDragging = false;
 
@@ -349,17 +347,6 @@
       if (Math.abs(currentX) > Math.abs(currentY)) {
         var rotate = currentX * 0.05;
         inner.style.transform = 'translateX(' + currentX + 'px) rotate(' + rotate + 'deg)';
-
-        if (currentX < -20) {
-          hintLeft.style.opacity = Math.min(1, Math.abs(currentX) / swipeThreshold);
-          hintRight.style.opacity = 0;
-        } else if (currentX > 20) {
-          hintRight.style.opacity = Math.min(1, Math.abs(currentX) / swipeThreshold);
-          hintLeft.style.opacity = 0;
-        } else {
-          hintLeft.style.opacity = 0;
-          hintRight.style.opacity = 0;
-        }
       }
     });
 
@@ -376,8 +363,6 @@
       } else {
         inner.style.transition = '';
         inner.style.transform = '';
-        hintLeft.style.opacity = 0;
-        hintRight.style.opacity = 0;
       }
       currentX = 0; currentY = 0;
     });
@@ -387,25 +372,51 @@
       isDragging = false;
       inner.style.transition = '';
       inner.style.transform = '';
-      hintLeft.style.opacity = 0;
-      hintRight.style.opacity = 0;
       currentX = 0; currentY = 0;
     });
+
+    // 🔥 ปุ่มลูกศร < > (สำหรับคนไม่สะดวกปัด)
+    root.appendChild(el('div', { class: 'row', style: 'margin-top:24px; justify-content:center; gap:24px;' }, [
+      el('button', { 
+        class: 'icon-btn', 
+        style: 'width:56px; height:56px; font-size:1.5rem;',
+        'aria-label': 'ข้อก่อนหน้า',
+        text: '<',
+        disabled: currentIndex === 0,
+        onclick: function () {
+          if (currentIndex > 0) {
+            currentIndex--;
+            flipped = false;
+            renderCard(root);
+          }
+        }
+      }),
+      el('button', { 
+        class: 'icon-btn btn-primary', 
+        style: 'width:56px; height:56px; font-size:1.5rem; border:none;',
+        'aria-label': 'ข้อถัดไป',
+        text: '>',
+        onclick: function () {
+          currentIndex++;
+          flipped = false;
+          renderCard(root);
+        }
+      })
+    ]));
   }
 
   function animateSwipe(direction, q, root) {
     var inner = document.querySelector('.flashcard-inner');
     if (!inner) return;
 
-    // ล้าง inline transform ค้างจากการลาก ก่อนใส่ class อนิเมชัน
     inner.style.transition = '';
     inner.style.transform = '';
-    // บังคับ reflow ให้ browser รับรู้ start state
     void inner.offsetWidth;
 
     inner.classList.add(direction === 'left' ? 'swipe-left' : 'swipe-right');
 
     setTimeout(function () {
+      // ปัดซ้าย/ขวา = บันทึก Leitner ตามปกติ
       updateBox(q, direction === 'right');
       currentIndex++;
       flipped = false;
