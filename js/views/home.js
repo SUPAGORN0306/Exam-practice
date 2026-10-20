@@ -61,55 +61,69 @@
       ]));
     }
 
-    // ---- Empty state ----
+    // ==========================================
+    // 🔥 Empty State (ยังไม่มีข้อสอบ)
+    // ==========================================
     if (questions.length === 0) {
-      root.appendChild(el('div', { class: 'card' }, [
-        el('h2', { text: 'ยินดีต้อนรับ' }),
-        el('p', { class: 'muted', text: 'ยังไม่มีข้อสอบในระบบ เริ่มได้ด้วยการโหลดตัวอย่าง เพิ่มเอง หรือนำเข้าจากไฟล์' }),
+      root.appendChild(el('div', { class: 'card center', style: 'padding: 40px 20px;' }, [
+        el('h2', { text: 'ยินดีต้อนรับสู่ Smart Practice' }),
+        el('p', { class: 'muted', style: 'margin: 8px 0 24px;', text: 'ยังไม่มีข้อสอบในระบบ เริ่มได้ด้วยการโหลดตัวอย่าง เพิ่มเอง หรือนำเข้าจากไฟล์' }),
+        
         el('div', { class: 'stack' }, [
-          el('button', { class: 'btn btn-primary btn-block', text: 'โหลดข้อสอบตัวอย่าง (20 ข้อ)', onclick: function () {
-            var existing = App.loadQuestions();
-            var ids = {};
-            existing.forEach(function (q) { if (q.id) ids[q.id] = true; });
-            var added = 0;
-            App.sampleQuestions.forEach(function (q) {
-              if (q.id && ids[q.id]) return;
-              existing.push(q); added++;
-            });
-            App.saveQuestions(existing);
-            App.toast('เพิ่มข้อสอบตัวอย่าง ' + added + ' ข้อ');
-            App.render();
-          }}),
-          el('button', { class: 'btn btn-block', text: 'เพิ่มข้อสอบ', onclick: function () { window.location.hash = '#/manage?tab=form'; } }),
-          el('button', { class: 'btn btn-block', text: 'นำเข้าจากไฟล์', onclick: function () { window.location.hash = '#/manage?tab=import'; } })
+          el('button', { 
+            class: 'btn btn-primary btn-block', 
+            style: 'min-height:56px;',
+            text: 'โหลดข้อสอบตัวอย่าง (20 ข้อ)', 
+            onclick: function () {
+              var existing = App.loadQuestions();
+              var ids = {};
+              existing.forEach(function (q) { if (q.id) ids[q.id] = true; });
+              var added = 0;
+              App.sampleQuestions.forEach(function (q) {
+                if (q.id && ids[q.id]) return;
+                existing.push(q); added++;
+              });
+              App.saveQuestions(existing);
+              App.toast('เพิ่มข้อสอบตัวอย่าง ' + added + ' ข้อ');
+              App.render();
+            }
+          }),
+          el('button', { 
+            class: 'btn btn-block', 
+            text: 'เพิ่มข้อสอบด้วยตัวเอง', 
+            onclick: function () { window.location.hash = '#/manage?tab=form'; } 
+          }),
+          el('button', { 
+            class: 'btn btn-block', 
+            text: 'นำเข้าจากไฟล์ JSON', 
+            onclick: function () { window.location.hash = '#/manage?tab=import'; } 
+          })
         ])
       ]));
       return;
     }
 
-    // ---- Big Start ----
+    // ==========================================
+    // 🔥 Big Start (เริ่มฝึกวันนี้)
+    // ==========================================
     var dueCount = App.stats.dueTodayCount(questions, progress, today);
     var statusText;
     if (dueCount > 0) statusText = 'วันนี้มี ' + dueCount + ' ข้อที่ถึงเวลาทบทวน';
     else if (Object.keys(progress).length === 0) statusText = 'พร้อมเริ่มชุดแรกของคุณ';
     else statusText = 'ไม่มีข้อค้างทบทวน — ฝึกเพิ่มได้เลย';
 
-    // 🔥 สร้างตัวเลือกขนาดชุดจากจำนวนข้อสอบที่มีจริง
     var totalQuestions = questions.length;
     var presets = [10, 20, 30, 45, 60, 80, 90];
     var sizeOptions = [];
     presets.forEach(function (val) {
       if (val <= totalQuestions) sizeOptions.push(val);
     });
-    // ถ้าจำนวนข้อสอบไม่ตรงกับ preset ไหนเลย ให้เพิ่มจำนวนจริงเข้าไป
     if (totalQuestions > 0 && presets.indexOf(totalQuestions) === -1) {
       sizeOptions.push(totalQuestions);
     }
-    // เพิ่ม "ทั้งหมด" ไว้ท้ายสุด (ใช้ค่า 0 แทน)
-    sizeOptions.push(0);
+    sizeOptions.push(0); // "ทั้งหมด"
 
     var chosenN = settings.defaultSessionSize || 20;
-    // ถ้าค่าเริ่มต้นไม่มีใน options ให้ใช้ตัวเลือกแรก
     if (sizeOptions.indexOf(chosenN) === -1) {
       chosenN = sizeOptions[0];
     }
@@ -151,25 +165,22 @@
       })
     ]));
 
-    // ---- Flashcards Card ----
+    // ==========================================
+    // 🔥 Flashcards Card
+    // ==========================================
     root.appendChild(el('div', { class: 'card' }, [
-      el('div', { class: 'row-between' }, [
-        el('div', { style: 'flex:1; min-width:0;' }, [
-          el('h3', { text: 'ท่องจำด้วยแฟลชการ์ด' }),
-          el('p', { class: 'muted small', style: 'margin:4px 0 0;', text: 'ปัดซ้าย-ขวาเพื่อทบทวนการ์ด พร้อมระบบ Leitner' })
-        ])
-      ]),
+      el('h3', { text: 'ท่องจำด้วยแฟลชการ์ด' }),
+      el('p', { class: 'muted small', style: 'margin:4px 0 12px;', text: 'ปัดซ้าย-ขวาเพื่อทบทวนการ์ด พร้อมระบบ Leitner' }),
       el('button', {
         class: 'btn btn-block',
-        style: 'margin-top:12px;',
         text: '▣ ฝึกแฟลชการ์ด',
-        onclick: function () {
-          window.location.hash = '#/flashcards';
-        }
+        onclick: function () { window.location.hash = '#/flashcards'; }
       })
     ]));
 
-    // ---- Goal + streak ----
+    // ==========================================
+    // 🔥 Goal + streak
+    // ==========================================
     var answeredToday = App.stats.dailyAnsweredCount(daily, today);
     var goal = settings.dailyGoal || 20;
     
@@ -222,7 +233,9 @@
       ])
     ]));
 
-    // ---- Subject cards ----
+    // ==========================================
+    // 🔥 Subject cards
+    // ==========================================
     var subjectSection = el('div', { class: 'stack' });
     subjectSection.appendChild(el('div', { class: 'section-title', text: 'ความคืบหน้ารายวิชา' }));
     
@@ -254,16 +267,18 @@
     });
     root.appendChild(subjectSection);
 
-    // ---- Review wrong ----
+    // ==========================================
+    // 🔥 Review wrong (มี margin-top เพิ่ม)
+    // ==========================================
     var wrongCount = questions.filter(function (q) {
       var p = progress[q.id];
       return p && (p.lapses || 0) > 0 && (p.box || 0) <= 2;
     }).length;
     if (wrongCount > 0) {
-      root.appendChild(el('div', { class: 'card' }, [
+      root.appendChild(el('div', { class: 'card', style: 'margin-top:24px;' }, [
         el('h3', { text: 'ทบทวนข้อที่เคยผิด' }),
-        el('p', { class: 'muted small', text: 'มี ' + wrongCount + ' ข้อที่ยังไม่แม่น' }),
-        el('button', { class: 'btn btn-block', text: 'ทบทวนข้อที่เคยผิด', onclick: function () {
+        el('p', { class: 'muted small', style: 'margin:4px 0 12px;', text: 'มี ' + wrongCount + ' ข้อที่ยังไม่แม่น' }),
+        el('button', { class: 'btn btn-primary btn-block', text: 'ทบทวนข้อที่เคยผิด', onclick: function () {
           var nToUse = (chosenN === 0) ? totalQuestions : chosenN;
           var res = App.scheduler.buildReviewWrongSession({
             questions: questions, progress: progress, n: nToUse,
@@ -316,7 +331,6 @@
     });
     sheet.appendChild(el('div', { class: 'field' }, [topicSelect]));
 
-    // 🔥 พื้นที่แสดงปุ่มจำนวนข้อ (จะอัปเดตตาม Topic ที่เลือก)
     var nRow = el('div', { class: 'row' });
     sheet.appendChild(el('p', { class: 'muted small', text: 'จำนวนข้อ' }));
     sheet.appendChild(nRow);
@@ -338,7 +352,6 @@
         options.push(totalAvailable);
       }
       
-      // ถ้าค่าที่เลือกไว้ (n) ไม่อยู่ใน options ให้เปลี่ยนเป็น "ทั้งหมด" (0)
       if (options.indexOf(n) === -1) {
         n = 0;
       }
@@ -356,7 +369,6 @@
         nRow.appendChild(b);
       });
 
-      // ปุ่ม "ทั้งหมด"
       var bAll = el('button', {
         class: 'chip' + (n === 0 ? ' selected' : ''),
         text: 'ทั้งหมด',

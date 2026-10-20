@@ -15,7 +15,7 @@
     }
 
     // ==========================================
-    // 1. การแสดงผล (Theme)
+    // 1. การแสดงผล (Theme + Language)
     // ==========================================
     var themeSelect = el('select', { class: 'select' });
     [{ v: 'light', t: 'สว่าง' }, { v: 'dark', t: 'มืด' }, { v: 'system', t: 'ตามเครื่อง' }].forEach(function (o) {
@@ -25,21 +25,68 @@
     });
     themeSelect.addEventListener('change', function () { update({ theme: themeSelect.value }); });
 
+    // 🔥 ภาษา (ยังไม่ได้แปลข้อความทั้งแอป แค่ UI ไว้ก่อน)
+    var langSelect = el('select', { class: 'select' });
+    [{ v: 'th', t: 'ไทย' }, { v: 'en', t: 'English (เร็วๆ นี้)' }].forEach(function (o) {
+      var opt = el('option', { value: o.v, text: o.t });
+      if ((s.language || 'th') === o.v) opt.selected = true;
+      langSelect.appendChild(opt);
+    });
+    langSelect.addEventListener('change', function () {
+      update({ language: langSelect.value });
+      App.toast('บันทึกภาษาแล้ว (ระบบแปลจะมาเร็วๆ นี้)');
+    });
+
     root.appendChild(el('div', { class: 'card' }, [
       el('h3', { text: 'การแสดงผล' }),
       el('div', { class: 'field' }, [
         el('span', { class: 'label', text: 'ธีม' }),
         themeSelect
+      ]),
+      el('div', { class: 'field' }, [
+        el('span', { class: 'label', text: 'ภาษา' }),
+        langSelect,
+        el('div', { class: 'hint', text: 'ระบบแปลทั้งแอปจะมาในเวอร์ชันถัดไป' })
       ])
     ]));
 
     // ==========================================
-    // 2. การฝึกฝน (Shuffle, Timer, Goal, Size)
+    // 2. การฝึกฝน (Shuffle, Timer, Goal, Size, Answer Mode)
     // ==========================================
-    var shuffleCb = el('input', { type: 'checkbox' });
-    shuffleCb.checked = !!s.shuffleChoices;
-    shuffleCb.addEventListener('change', function () { update({ shuffleChoices: shuffleCb.checked }); });
 
+    // Toggle Switch "สลับลำดับตัวเลือก"
+    var shuffleToggle = el('div', {
+      style: 'display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; cursor:pointer;',
+      onclick: function () {
+        var newVal = !s.shuffleChoices;
+        update({ shuffleChoices: newVal });
+        if (newVal) {
+          shuffleKnob.style.transform = 'translateX(20px)';
+          shuffleTrack.style.background = 'var(--primary)';
+        } else {
+          shuffleKnob.style.transform = 'translateX(0)';
+          shuffleTrack.style.background = 'var(--border)';
+        }
+      }
+    });
+
+    var shuffleTrack = el('div', {
+      style: 'width:44px; height:24px; border-radius:999px; background:' + (s.shuffleChoices ? 'var(--primary)' : 'var(--border)') + '; position:relative; transition:background 0.2s ease; flex-shrink:0;'
+    });
+
+    var shuffleKnob = el('div', {
+      style: 'width:20px; height:20px; border-radius:50%; background:#fff; position:absolute; top:2px; left:2px; transition:transform 0.2s ease; box-shadow:0 1px 3px rgba(0,0,0,0.2); transform:' + (s.shuffleChoices ? 'translateX(20px)' : 'translateX(0)') + ';'
+    });
+
+    shuffleTrack.appendChild(shuffleKnob);
+
+    shuffleToggle.appendChild(el('div', null, [
+      el('div', { style: 'font-weight:600; font-size:0.95rem;', text: 'สลับลำดับตัวเลือก' }),
+      el('div', { class: 'small muted', style: 'margin-top:2px;', text: 'สุ่มลำดับ ก ข ค ง ในข้อสอบ' })
+    ]));
+    shuffleToggle.appendChild(shuffleTrack);
+
+    // Timer
     var timerSelect = el('select', { class: 'select' });
     [{ v: 'untimed', t: 'ไม่จำกัดเวลา' }, { v: 'timed', t: 'ตั้งเวลาต่อชุด' }].forEach(function (o) {
       var opt = el('option', { value: o.v, text: o.t });
@@ -55,7 +102,6 @@
       update({ secondsPerQuestion: v });
     });
 
-    // 🔥 ซ่อน/แสดงช่องกรอกวินาที ตามการเลือกโหมด
     var secField = el('div', { class: 'field' }, [
       el('span', { class: 'label', text: 'วินาทีต่อข้อ' }),
       secInput,
@@ -84,10 +130,26 @@
     });
     sizeSelect.addEventListener('change', function () { update({ defaultSessionSize: parseInt(sizeSelect.value, 10) }); });
 
+    // 🔥 รูปแบบการตอบ (answerMode - ใช้ใน localStorage)
+    var answerMode = localStorage.getItem('answerMode') || 'button';
+    var answerModeSelect = el('select', { class: 'select' });
+    [{ v: 'button', t: 'กดปุ่ม (ทีละข้อ)' }, { v: 'scroll', t: 'เลื่อนลง (กระดาษคำตอบ)' }].forEach(function (o) {
+      var opt = el('option', { value: o.v, text: o.t });
+      if (answerMode === o.v) opt.selected = true;
+      answerModeSelect.appendChild(opt);
+    });
+    answerModeSelect.addEventListener('change', function () {
+      localStorage.setItem('answerMode', answerModeSelect.value);
+      App.toast('บันทึกรูปแบบการตอบแล้ว');
+    });
+
     root.appendChild(el('div', { class: 'card' }, [
       el('h3', { text: 'การฝึกฝน' }),
-      el('div', { class: 'field' }, [
-        el('label', { class: 'row', style: 'cursor:pointer;' }, [shuffleCb, el('span', { text: 'สลับลำดับตัวเลือก' })])
+      shuffleToggle,
+      el('div', { class: 'field', style: 'margin-top:16px;' }, [
+        el('span', { class: 'label', text: 'รูปแบบการตอบ' }),
+        answerModeSelect,
+        el('div', { class: 'hint', text: 'แบบกดปุ่ม = ทำทีละข้อ, แบบเลื่อนลง = แสดงทุกข้อในหน้ายาว' })
       ]),
       el('div', { class: 'field' }, [
         el('span', { class: 'label', text: 'การจับเวลา' }),
@@ -111,14 +173,14 @@
     var keyInput = el('input', { class: 'input', type: 'password', placeholder: 'วาง API Key ที่นี่' });
     keyInput.value = apiKey || '';
     
-    var modelInput = el('input', { class: 'input', placeholder: 'claude-haiku-5-5' });
+    var modelInput = el('input', { class: 'input', placeholder: 'claude-3-5-haiku-20241022' });
     modelInput.value = App.askai.getModel();
 
     var saveKeyBtn = el('button', {
       class: 'btn btn-primary', text: 'บันทึก Key',
       onclick: function () {
         App.askai.setApiKey(keyInput.value.trim());
-        App.askai.setModel(modelInput.value.trim() || 'claude-haiku-5-5');
+        App.askai.setModel(modelInput.value.trim() || 'claude-3-5-haiku-20241022');
         App.toast('บันทึกการตั้งค่า AI แล้ว');
         App.render();
       }
@@ -151,49 +213,65 @@
       el('div', { class: 'field' }, [
         el('span', { class: 'label', text: 'ชื่อโมเดล' }),
         modelInput,
-        el('div', { class: 'hint', text: 'ค่าเริ่มต้น claude-haiku-5-5' })
+        el('div', { class: 'hint', text: 'ค่าเริ่มต้น claude-3-5-haiku-20241022' })
       ]),
       el('div', { class: 'row' }, [saveKeyBtn, clearKeyBtn])
     ]));
 
     // ==========================================
-    // 4. ข้อมูล (Data Management)
+    // 4. ข้อมูล (Data Management) - แยกการ์ด
     // ==========================================
-    var resetBtn = el('button', { 
-      class: 'btn btn-danger', 
-      text: 'รีเซ็ตความคืบหน้า', 
-      onclick: function () {
-        if (!App.confirm('ยืนยันการรีเซ็ตความคืบหน้า? (ข้อสอบจะยังอยู่ แต่สถิติและ Leitner จะหายหมด)')) return;
-        App.storage.setProgress({});
-        App.storage.setSessions([]);
-        App.storage.setCauses({});
-        App.storage.setDaily({});
-        App.storage.setTopicRecent({});
-        App.storage.setActiveSession(null);
-        App.toast('รีเซ็ตความคืบหน้าแล้ว');
-        App.render();
-      }
-    });
-    
-    var wipeBtn = el('button', { 
-      class: 'btn btn-danger', 
-      text: 'ลบข้อมูลทั้งหมด', 
-      onclick: function () {
-        if (!App.confirm('ยืนยันการลบข้อมูลทั้งหมด? (ข้อสอบ, สถิติ, การตั้งค่าจะหายหมด)')) return;
-        App.storage.clearAll();
-        App.toast('ลบข้อมูลทั้งหมดแล้ว');
-        App.navigate('home');
-      }
-    });
 
+    // 🔥 การ์ดสำรองข้อมูล
     root.appendChild(el('div', { class: 'card' }, [
-      el('h3', { text: 'จัดการข้อมูล' }),
-      el('div', { class: 'stack' }, [
-        el('button', { class: 'btn', text: 'ไปหน้าสำรอง/กู้คืน', onclick: function () { window.location.hash = '#/manage?tab=import'; } }),
-        resetBtn, 
-        wipeBtn
-      ]),
-      el('p', { class: 'small muted', style: 'margin-top:12px;', text: 'ข้อมูลอยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น มือถือกับคอมไม่ซิงก์กัน — ย้ายด้วยไฟล์สำรอง' })
+      el('h3', { text: 'สำรองข้อมูล' }),
+      el('p', { class: 'small muted', style: 'margin:8px 0 12px;', text: 'ดาวน์โหลดข้อมูลทั้งหมดเป็นไฟล์ JSON หรือกู้คืนจากไฟล์สำรอง' }),
+      el('button', {
+        class: 'btn btn-primary btn-block',
+        text: 'ไปหน้าสำรอง/กู้คืน',
+        onclick: function () { window.location.hash = '#/manage?tab=import'; }
+      })
+    ]));
+
+    // 🔥 การ์ดรีเซ็ตความคืบหน้า
+    root.appendChild(el('div', { class: 'card' }, [
+      el('h3', { text: 'รีเซ็ตความคืบหน้า' }),
+      el('p', { class: 'small muted', style: 'margin:8px 0 12px;', text: 'ล้างสถิติการเรียน, กล่อง Leitner, และวันที่ทบทวนทั้งหมด (ข้อสอบยังอยู่)' }),
+      el('button', {
+        class: 'btn btn-danger btn-block',
+        text: 'รีเซ็ตความคืบหน้า',
+        onclick: function () {
+          if (!App.confirm('ยืนยันการรีเซ็ตความคืบหน้า?\n\nข้อสอบจะยังอยู่ แต่สถิติและ Leitner จะหายหมด')) return;
+          App.storage.setProgress({});
+          App.storage.setSessions([]);
+          App.storage.setCauses({});
+          App.storage.setDaily({});
+          App.storage.setTopicRecent({});
+          App.storage.setActiveSession(null);
+          App.toast('รีเซ็ตความคืบหน้าแล้ว');
+          App.render();
+        }
+      })
+    ]));
+
+    // 🔥 การ์ดลบข้อมูลทั้งหมด
+    root.appendChild(el('div', { class: 'card' }, [
+      el('h3', { text: 'ลบข้อมูลทั้งหมด' }),
+      el('p', { class: 'small muted', style: 'margin:8px 0 12px;', text: 'ลบทุกอย่างในแอป (ข้อสอบ, สถิติ, การตั้งค่า) ไม่สามารถกู้คืนได้' }),
+      el('button', {
+        class: 'btn btn-danger btn-block',
+        text: 'ลบข้อมูลทั้งหมด',
+        onclick: function () {
+          if (!App.confirm('ยืนยันการลบข้อมูลทั้งหมด?\n\nข้อสอบ, สถิติ, การตั้งค่าจะหายหมด และกู้คืนไม่ได้')) return;
+          App.storage.clearAll();
+          App.toast('ลบข้อมูลทั้งหมดแล้ว');
+          App.navigate('home');
+        }
+      })
+    ]));
+
+    root.appendChild(el('div', { class: 'card center' }, [
+      el('p', { class: 'small muted', text: 'ข้อมูลอยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น มือถือกับคอมไม่ซิงก์กัน — ย้ายด้วยไฟล์สำรอง' })
     ]));
 
     // ==========================================

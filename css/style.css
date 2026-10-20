@@ -538,3 +538,8 @@ html[data-theme='dark'] .choice-btn.wrong {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* ปิดสีฟ้าตอนแตะ (Tap Highlight) */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
