@@ -1,4 +1,4 @@
-/* Flashcards mode — swipeable cards with subject/topic selection */
+/* Flashcards mode — 3D Flip, Swipe, Subject/Topic Selection */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -20,7 +20,6 @@
     var el = App.el;
     var questions = App.loadQuestions();
     var progress = App.storage.getProgress();
-    var settings = App.storage.getSettings();
 
     if (questions.length === 0) {
       root.appendChild(el('div', { class: 'empty' }, [
@@ -38,7 +37,6 @@
       el('h2', { text: 'ฝึกแฟลชการ์ด' }),
       el('p', { class: 'muted small', text: 'เลือกวิชาและบทที่ต้องการทบทวน' }),
       
-      // Subject Select
       el('div', { class: 'field', style: 'margin-top:16px;' }, [
         el('span', { class: 'label', text: 'วิชา' }),
         (function() {
@@ -58,7 +56,6 @@
         })()
       ]),
 
-      // Topic Select (Container)
       el('div', { class: 'field', id: 'fc-topic-wrap' }, [
         el('span', { class: 'label', text: 'บท (ไม่บังคับ)' }),
         el('div', { id: 'fc-topic-container' }, [
@@ -106,11 +103,9 @@
   };
 
   function startSession(root, subjectId, topicName) {
-    var el = App.el;
     var questions = App.loadQuestions();
     var progress = App.storage.getProgress();
 
-    // Filter questions
     var pool = questions.filter(function(q) {
       if (subjectId && q.subject !== subjectId) return false;
       if (topicName && q.topic !== topicName) return false;
@@ -122,7 +117,6 @@
       return;
     }
 
-    // Split into due vs rest
     var due = [];
     var rest = [];
     pool.forEach(function (q) {
@@ -133,9 +127,8 @@
 
     due = shuffle(due);
     rest = shuffle(rest);
-    var selected = due.concat(rest).slice(0, 20);
+    cards = due.concat(rest).slice(0, 20);
 
-    cards = selected;
     currentIndex = 0;
     flipped = false;
 
@@ -144,7 +137,6 @@
 
   function renderCard(root, subjectId, topicName) {
     var el = App.el;
-    // Clear root
     while (root.firstChild) root.removeChild(root.firstChild);
 
     // Top bar
@@ -152,26 +144,14 @@
       class: 'session-top', 
       style: 'display:flex; align-items:center; gap:12px; margin-bottom:16px;' 
     }, [
-      el('button', { 
-        class: 'icon-btn', 
-        text: '✕', 
-        onclick: function () { App.navigate('home'); } 
-      }),
-      el('div', { 
-        class: 'small muted', 
-        style: 'white-space:nowrap;', 
-        text: (currentIndex + 1) + ' / ' + cards.length 
-      }),
-      el('div', { 
-        class: 'progress-bar', 
-        style: 'flex:1; margin:0 8px;' 
-      }, [
+      el('button', { class: 'icon-btn', text: '✕', onclick: function () { App.navigate('home'); } }),
+      el('div', { class: 'small muted', style: 'white-space:nowrap;', text: (currentIndex + 1) + ' / ' + cards.length }),
+      el('div', { class: 'progress-bar', style: 'flex:1; margin:0 8px;' }, [
         el('div', { class: 'fill', style: 'width:' + Math.round((currentIndex / cards.length) * 100) + '%' })
       ])
     ]));
 
     if (currentIndex >= cards.length) {
-      // Done
       root.appendChild(el('div', { class: 'card center' }, [
         el('h2', { text: 'จบชุดแฟลชการ์ด' }),
         el('p', { class: 'muted', text: 'ทบทวนครบ ' + cards.length + ' ใบแล้ว' }),
@@ -185,66 +165,135 @@
 
     var q = cards[currentIndex];
 
-    var card = el('div', { 
-      class: 'card', 
-      style: 'min-height: 350px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; cursor: pointer; transition: all 0.2s;' 
-    });
+    // Card container
+    var scene = el('div', { class: 'flashcard-scene' });
+    var inner = el('div', { class: 'flashcard-inner' + (flipped ? ' is-flipped' : '') });
     
-    if (!flipped) {
-      card.appendChild(el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic }));
-      card.appendChild(el('h2', { style: 'margin-top:16px; white-space:pre-wrap;', text: q.question }));
-      card.appendChild(el('p', { class: 'muted', style: 'margin-top:32px; font-size:0.9rem;', text: 'แตะเพื่อดูเฉลย' }));
-      
-      card.addEventListener('click', function () {
-        flipped = true;
-        renderCard(root, subjectId, topicName);
-      });
-    } else {
-      card.appendChild(el('div', { class: 'small muted', text: 'เฉลย' }));
-      var correctText = q.choices[q.answer];
-      card.appendChild(el('h2', { style: 'margin-top:12px; color: var(--correct);', text: correctText }));
-      
-      card.appendChild(el('div', { style: 'margin-top:16px; text-align:left; width:100%; background:var(--bg); padding:16px; border-radius:12px;' }, [
+    // Front
+    var front = el('div', { class: 'flashcard-front' }, [
+      el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic }),
+      el('h2', { style: 'margin-top:16px; white-space:pre-wrap;', text: q.question }),
+      el('p', { class: 'muted', style: 'margin-top:32px; font-size:0.9rem;', text: 'แตะเพื่อพลิกดูเฉลย' })
+    ]);
+
+    // Back
+    var back = el('div', { class: 'flashcard-back' }, [
+      el('div', { class: 'small muted', text: 'เฉลย' }),
+      el('h2', { style: 'margin-top:12px; color: var(--correct);', text: q.choices[q.answer] }),
+      el('div', { style: 'margin-top:16px; text-align:left; width:100%; background:var(--bg); padding:16px; border-radius:12px;' }, [
         el('div', { class: 'small muted', text: 'คำอธิบาย:' }),
         el('p', { style: 'margin-top:8px; white-space:pre-wrap;', text: q.explanation })
-      ]));
+      ])
+    ]);
 
-      var actionRow = el('div', { class: 'row', style: 'margin-top:24px; width:100%;' }, [
-        el('button', { 
-          class: 'btn btn-danger', 
-          style: 'flex:1;', 
-          text: 'จำไม่ได้', 
-          onclick: function (e) {
-            e.stopPropagation();
-            e.preventDefault();
-            updateBox(q, false);
-            currentIndex++;
-            flipped = false;
-            renderCard(root, subjectId, topicName);
-          }
-        }),
-        el('button', { 
-          class: 'btn btn-primary', 
-          style: 'flex:1;', 
-          text: 'จำได้', 
-          onclick: function (e) {
-            e.stopPropagation();
-            e.preventDefault();
-            updateBox(q, true);
-            currentIndex++;
-            flipped = false;
-            renderCard(root, subjectId, topicName);
-          }
-        })
-      ]);
-      card.appendChild(actionRow);
-      
-      card.addEventListener('click', function(e) {
-        e.stopPropagation();
-      });
+    inner.appendChild(front);
+    inner.appendChild(back);
+    scene.appendChild(inner);
+    root.appendChild(scene);
+
+    // Hint labels (Swipe)
+    var hintLeft = el('div', { class: 'swipe-hint hint-left', text: 'จำไม่ได้' });
+    var hintRight = el('div', { class: 'swipe-hint hint-right', text: 'จำได้' });
+    scene.appendChild(hintLeft);
+    scene.appendChild(hintRight);
+
+    // Flip Logic
+    inner.addEventListener('click', function () {
+      // ป้องกันการพลิกตอนกำลังลากการ์ด
+      if (isDragging) return;
+      flipped = !flipped;
+      inner.classList.toggle('is-flipped', flipped);
+    });
+
+    // Bottom Actions (Fallback for desktop)
+    root.appendChild(el('div', { class: 'row', style: 'margin-top:24px;' }, [
+      el('button', { class: 'btn btn-danger', style: 'flex:1;', text: 'จำไม่ได้', onclick: function () {
+        animateSwipe('left', q, subjectId, topicName, root);
+      }}),
+      el('button', { class: 'btn btn-primary', style: 'flex:1;', text: 'จำได้', onclick: function () {
+        animateSwipe('right', q, subjectId, topicName, root);
+      }})
+    ]));
+
+    // Swipe Logic (Pointer Events)
+    var startX = 0, startY = 0, currentX = 0, currentY = 0;
+    var isDragging = false;
+    var swipeThreshold = 80;
+
+    scene.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('button')) return; // ไม่ลากถ้ากดปุ่ม
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      inner.style.transition = 'none'; // ปิด transition ตอนลาก
+      scene.setPointerCapture(e.pointerId);
+    });
+
+    scene.addEventListener('pointermove', function (e) {
+      if (!isDragging) return;
+      currentX = e.clientX - startX;
+      currentY = e.clientY - startY;
+
+      // ถ้าลากแนวนอนมากกว่าแนวตั้ง ให้ทำการหมุน/เลื่อน
+      if (Math.abs(currentX) > Math.abs(currentY)) {
+        var rotate = currentX * 0.05;
+        inner.style.transform = 'translateX(' + currentX + 'px) rotate(' + rotate + 'deg)';
+        
+        // แสดง hint
+        if (currentX < -20) {
+          hintLeft.style.opacity = Math.min(1, Math.abs(currentX) / swipeThreshold);
+          hintRight.style.opacity = 0;
+        } else if (currentX > 20) {
+          hintRight.style.opacity = Math.min(1, Math.abs(currentX) / swipeThreshold);
+          hintLeft.style.opacity = 0;
+        } else {
+          hintLeft.style.opacity = 0;
+          hintRight.style.opacity = 0;
+        }
+      }
+    });
+
+    scene.addEventListener('pointerup', function (e) {
+      if (!isDragging) return;
+      isDragging = false;
+      inner.style.transition = '';
+
+      if (currentX < -swipeThreshold) {
+        // ปัดซ้าย (จำไม่ได้)
+        animateSwipe('left', q, subjectId, topicName, root);
+      } else if (currentX > swipeThreshold) {
+        // ปัดขวา (จำได้)
+        animateSwipe('right', q, subjectId, topicName, root);
+      } else {
+        // ดีดกลับ
+        inner.style.transform = '';
+        hintLeft.style.opacity = 0;
+        hintRight.style.opacity = 0;
+      }
+      currentX = 0; currentY = 0;
+    });
+  }
+
+  function animateSwipe(direction, q, subjectId, topicName, root) {
+    var inner = document.querySelector('.flashcard-inner');
+    var hintLeft = document.querySelector('.hint-left');
+    var hintRight = document.querySelector('.hint-right');
+    
+    if (inner) {
+      inner.classList.add(direction === 'left' ? 'swipe-left' : 'swipe-right');
     }
 
-    root.appendChild(card);
+    // อัปเดตกล่อง Leitner
+    setTimeout(function () {
+      if (direction === 'left') {
+        updateBox(q, false); // จำไม่ได้
+      } else {
+        updateBox(q, true);  // จำได้
+      }
+      currentIndex++;
+      flipped = false;
+      renderCard(root, subjectId, topicName);
+    }, 300); // รออนิเมชัน 0.3s
   }
 
   function updateBox(q, remembered) {

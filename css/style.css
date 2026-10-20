@@ -349,6 +349,96 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .confidence-bar { bottom: var(--pad); }
 }
 
+/* ------------------ Flashcard 3D & Swipe ------------------ */
+
+.flashcard-scene {
+  width: 100%;
+  height: 400px;
+  perspective: 1000px;
+  margin-top: 12px;
+  position: relative;
+  touch-action: pan-y; /* เพื่อให้ใช้ swipe ได้ */
+}
+
+.flashcard-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+  transform-style: preserve-3d;
+  cursor: pointer;
+}
+
+.flashcard-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.flashcard-front, .flashcard-back {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0; left: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  text-align: center;
+  overflow-y: auto;
+}
+
+.flashcard-back {
+  transform: rotateY(180deg);
+  justify-content: flex-start;
+  align-items: flex-start;
+  text-align: left;
+}
+
+/* อนิเมชันตอนปัดการ์ด */
+.swipe-card {
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+.swipe-card.swipe-left {
+  transform: translateX(-150%) rotate(-15deg) !important;
+  opacity: 0;
+}
+.swipe-card.swipe-right {
+  transform: translateX(150%) rotate(15deg) !important;
+  opacity: 0;
+}
+
+/* ป้ายบอกสถานะตอนลาก */
+.swipe-hint {
+  position: absolute;
+  top: 20px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  border: 4px solid;
+  padding: 4px 12px;
+  border-radius: 8px;
+  z-index: 10;
+}
+.swipe-hint.hint-left {
+  right: 20px;
+  color: var(--wrong);
+  border-color: var(--wrong);
+  transform: rotate(-15deg);
+}
+.swipe-hint.hint-right {
+  left: 20px;
+  color: var(--correct);
+  border-color: var(--correct);
+  transform: rotate(15deg);
+}
 /* ------------------ Reduced motion ------------------ */
 
 @media (prefers-reduced-motion: reduce) {
