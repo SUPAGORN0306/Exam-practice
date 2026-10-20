@@ -155,6 +155,10 @@
   // 🔥 ฟังก์ชันสร้าง Grid Navigator (แบบกรอบสี)
   // ==========================================
   function openGridNavigator(session, onSelect) {
+    // 🔥 ดึงข้อมูลสดๆ จาก Storage ทันที
+    session = App.storage.getActiveSession();
+    if (!session) return;
+
     var el = App.el;
     var overlay = el('div', {
       style: 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:60; display:flex; align-items:flex-end; justify-content:flex-start;',
@@ -228,6 +232,7 @@
     var isTimed = s.timer.mode === 'timed';
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs) });
 
+    // 🔥 ดึงจำนวนข้อที่ตอบแล้ว (ใช้ฟังก์ชันที่ดึงจาก storage สดๆ)
     var answeredCounterEl = el('div', { class: 'small muted', style: 'white-space:nowrap;', text: countAnswered(s) + ' / ' + s.queue.length });
 
     var progressFill = el('div', { class: 'fill', style: 'width:0%' });
@@ -303,10 +308,10 @@
             activeS.timer.elapsedMs = sessionElapsedMs;
             App.storage.setActiveSession(activeS);
 
-            // 🔥 อัปเดต session ในหน่วยความจำด้วย (ให้ผังเห็นค่าล่าสุด)
             s = activeS;
             existing = { qid: q.id, chosen: origIdx, confidence: null, isRecheck: cq.isRecheck, correct: null };
 
+            // 🔥 อัปเดตตัวเลขทันที
             answeredCounterEl.textContent = countAnswered(activeS) + ' / ' + activeS.queue.length;
           }
         });

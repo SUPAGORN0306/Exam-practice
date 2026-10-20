@@ -44,10 +44,21 @@
       ]));
     }
 
-    // ---- Resume banner ----
+    // ---- Resume banner (แก้ให้แสดงชื่อชุด) ----
     if (active) {
+      var sessionLabel = 'ชุดฝึก';
+      if (active.meta && active.meta.type) {
+        var metaType = active.meta.type;
+        if (metaType === 'auto') sessionLabel = 'ชุดฝึกวันนี้';
+        else if (metaType === 'subject') sessionLabel = 'ฝึกวิชา ' + (active.meta.subjectName || '');
+        else if (metaType === 'reviewWrong') sessionLabel = 'ทบทวนข้อที่เคยผิด';
+        else if (metaType === 'flashcards') sessionLabel = 'แฟลชการ์ด';
+      } else if (active.mode === 'auto') {
+        sessionLabel = 'ชุดฝึกอัตโนมัติ';
+      }
+
       root.appendChild(el('div', { class: 'card' }, [
-        el('h2', { text: 'ชุดที่ค้างอยู่' }),
+        el('h2', { text: sessionLabel }),
         el('p', { class: 'muted small', text: 'ตอบแล้ว ' + (active.answers ? active.answers.length : 0) + ' / ' + active.n + ' ข้อ' }),
         el('div', { class: 'row', style: 'margin-top:8px;' }, [
           el('button', { class: 'btn btn-primary', text: 'ทำต่อ', onclick: function () { App.navigate('session'); App.render(); } }),
@@ -159,6 +170,9 @@
             n: nToUse, filter: { subject: null, topics: [] }
           });
           if (!result.ids.length) { App.toast('ไม่มีข้อสอบให้ฝึก'); return; }
+          // 🔥 ส่ง meta พร้อม type
+          result.meta = result.meta || {};
+          result.meta.type = 'auto';
           App.views.session.startNew(result.ids, result.meta);
           App.render();
         }
@@ -268,7 +282,7 @@
     root.appendChild(subjectSection);
 
     // ==========================================
-    // 🔥 Review wrong (มี margin-top เพิ่ม)
+    // 🔥 Review wrong
     // ==========================================
     var wrongCount = questions.filter(function (q) {
       var p = progress[q.id];
@@ -285,6 +299,8 @@
             filter: { subject: null, topics: [] }
           });
           if (!res.ids.length) { App.toast('ไม่มีข้อที่ต้องทบทวน'); return; }
+          res.meta = res.meta || {};
+          res.meta.type = 'reviewWrong';
           App.views.session.startNew(res.ids, res.meta);
           App.render();
         }})
@@ -399,6 +415,12 @@
           n: nToUse, filter: { subject: subject.id, topics: selectedTopic ? [selectedTopic] : [] }
         });
         if (!res.ids.length) { App.toast('ไม่มีข้อในเงื่อนไขนี้'); return; }
+        
+        // 🔥 ส่ง meta พร้อม type
+        res.meta = res.meta || {};
+        res.meta.type = 'subject';
+        res.meta.subjectName = subject.name;
+        
         closeSheet();
         App.views.session.startNew(res.ids, res.meta);
         App.render();
