@@ -50,7 +50,7 @@
         el('span', { class: 'label', text: 'วิชา' }),
         (function () {
           var sel = el('select', { class: 'select' });
-          sel.appendChild(el('option', { value: '', text: '-- ทุกวิชา --' }));
+          sel.appendChild(el('option', { value: '', text: 'ทุกวิชา' }));
           App.subjects.forEach(function (s) {
             var count = questions.filter(function (q) { return q.subject === s.id; }).length;
             if (count > 0) {

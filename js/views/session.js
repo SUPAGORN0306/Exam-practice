@@ -88,7 +88,9 @@
     }
 
     var order = session.choiceOrders[q.id] || q.choices.map(function (_, i) { return i; });
-    var existing = session.answers.find(function (a) { return a.qid === q.id && a.isRecheck === current.isRecheck; });
+    var existing = session.answers.find(function (a) { 
+      return a.qid === q.id && !!a.isRecheck === !!current.isRecheck; 
+    });
     var isScrollMode = (localStorage.getItem('answerMode') || 'button') === 'scroll';
 
     // --- Top bar ---
@@ -96,9 +98,7 @@
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs || session.timer.elapsedMs || 0) });
     var totalEl = el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: isTimed ? formatMs(session.timer.totalMs) : '' });
 
-    var topContainer = el('div', { class: 'session-top', style: 'display:flex; flex-direction:column; gap:12px; margin-bottom:16px;' });
-    
-    var row1 = el('div', { style: 'display:flex; align-items:center; gap:10px; width:100%;' }, [
+    var topContainer = el('div', { class: 'session-top', style: 'display:flex; align-items:center; gap:10px; margin-bottom:16px; width:100%;' }, [
       el('button', { 
         class: 'icon-btn', 'aria-label': 'ออก', text: '✕', 
         onclick: function () {
@@ -115,32 +115,7 @@
       el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [el('div', { class: 'fill', style: 'width:' + Math.round((session.index / session.queue.length) * 100) + '%' })]),
       totalEl
     ]);
-    topContainer.appendChild(row1);
-
-    // 🔥 ตรวจสอบว่าอยู่ข้อสุดท้ายหรือยัง
-    var isLastQ = (session.index === session.queue.length - 1);
     
-    var row2 = el('div', { style: 'display:flex; justify-content:center; gap:16px; margin-top:4px;' }, [
-      el('button', {
-        class: 'icon-btn', 'aria-label': 'ย้อนกลับ', text: '<',
-        disabled: session.index === 0,
-        style: session.index === 0 ? 'opacity:0.3; pointer-events:none;' : '',
-        onclick: function () {
-          if (session.index > 0) {
-            session.index--;
-            App.storage.setActiveSession(session);
-            App.render();
-          }
-        }
-      }),
-      isLastQ ? 
-        // 🔥 ข้อสุดท้าย: แสดงปุ่ม "ส่งคำตอบ" (ในโหมดปกติ)
-        (!isScrollMode ? el('button', { class: 'btn btn-primary', text: 'ส่งคำตอบ', onclick: function() { finishSession(session); } }) : el('div', {style: 'width:48px;'})) 
-        : 
-        // 🔥 ยังไม่สุด: แสดงปุ่มลูกศรขวา
-        el('button', { class: 'icon-btn', 'aria-label': 'ข้อถัดไป', text: '>', onclick: function () { goNext(session); } })
-    ]);
-    topContainer.appendChild(row2);
     root.appendChild(topContainer);
 
     // --- Timer tick ---
@@ -225,6 +200,28 @@
     root.appendChild(card);
     root.appendChild(bottomWrap);
 
+    // 🔥 ปุ่ม Navigation ชิดซ้าย-ขวา ให้ตรงกับ Card (กล่องโจทย์)
+    var isLastQ = (session.index === session.queue.length - 1);
+    
+    root.appendChild(el('div', { style: 'display:flex; justify-content:space-between; margin-top:24px; margin-bottom:24px;' }, [
+      el('button', {
+        class: 'icon-btn', 'aria-label': 'ย้อนกลับ', text: '<',
+        style: 'width:56px; height:56px; font-size:1.5rem;' + (session.index === 0 ? 'opacity:0.3; pointer-events:none;' : ''),
+        disabled: session.index === 0,
+        onclick: function () {
+          if (session.index > 0) {
+            session.index--;
+            App.storage.setActiveSession(session);
+            App.render();
+          }
+        }
+      }),
+      isLastQ ? 
+        (!isScrollMode ? el('button', { class: 'btn btn-primary', style: 'height:56px; padding: 0 24px;', text: 'ส่งคำตอบ', onclick: function() { finishSession(session); } }) : el('div', {style: 'width:56px;'})) 
+        : 
+        el('button', { class: 'icon-btn', 'aria-label': 'ข้อถัดไป', text: '>', style: 'width:56px; height:56px; font-size:1.5rem;', onclick: function () { goNext(session); } })
+    ]));
+
     // 🔥 Floating Submit Button (สำหรับโหมด Scroll)
     if (isLastQ && isScrollMode) {
       root.appendChild(el('button', {
@@ -271,7 +268,9 @@
       App.recordDaily(q, confidence, correct, timeMs);
     }
 
-    session.answers = session.answers.filter(function(a) { return a.qid !== q.id || a.isRecheck !== current.isRecheck; });
+    session.answers = session.answers.filter(function(a) { 
+      return a.qid !== q.id || !!a.isRecheck !== !!current.isRecheck; 
+    });
     session.answers.push(answer);
     session.timer.elapsedMs = sessionElapsedMs;
     App.storage.setActiveSession(session);
