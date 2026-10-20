@@ -440,6 +440,52 @@ button, input, select, textarea { font: inherit; color: inherit; }
   transform: rotate(15deg);
 }
 /* ------------------ Reduced motion ------------------ */
+/* ------------------ Small buttons & checkbox rows ------------------ */
+
+.btn-small {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 0.88rem;
+  border-radius: var(--radius-sm);
+}
+
+.btn-small.btn-primary {
+  /* ให้ปุ่มลัดที่ active ดูเด่นชัด */
+  box-shadow: 0 1px 3px rgba(47, 91, 234, 0.35);
+}
+
+/* แถว checkbox แต่ละบท */
+.check-row {
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
+}
+.check-row:hover {
+  background: rgba(47, 91, 234, 0.05);
+}
+.check-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.check-row label {
+  font-size: 0.95rem;
+  color: var(--text);
+  user-select: none;
+}
+
+/* ระยะห่างระหว่าง checkbox แต่ละบท */
+#fc-chapter-container .check-row + .check-row {
+  border-top: 1px solid var(--border);
+}
+
+/* ระยะห่างของแถวปุ่มลัดจำนวนข้อ */
+#fc-limit-container {
+  margin-top: 4px;
+}
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
