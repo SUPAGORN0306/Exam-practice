@@ -1,4 +1,4 @@
-/* Session view — timers (untimed/timed), visibility pause, per-question timing */
+/* Session view — timers (untimed/timed), visibility pause, per-question timing, chat AI */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -324,15 +324,31 @@
       wrap.appendChild(chipRow);
     }
 
-    var aiRow = el('div', { class: 'row' }, [
-      el('button', { class: 'btn', text: 'ถาม AI', onclick: function () {
-        var text = App.askai.buildAskAIText(q, order, answer.chosen, answer.confidence);
-        App.askai.copyText(text).then(
-          function () { App.toast('คัดลอกแล้ว เปิด Claude เพื่อวาง'); window.open('https://claude.ai', '_blank', 'noopener'); },
-          function () { App.toast('คัดลอกไม่สำเร็จ'); }
-        );
-      }}),
-      el('button', { class: 'btn btn-ghost', text: 'แก้ไขข้อนี้', onclick: function () { window.location.hash = '#/manage?edit=' + encodeURIComponent(q.id); } })
+    // --- 4. Ask AI / Chat AI / Edit ---
+    var aiRow = el('div', { class: 'row', style: 'flex-wrap:wrap;' }, [
+      el('button', {
+        class: 'btn',
+        text: 'ถาม AI (คัดลอก)',
+        onclick: function () {
+          var text = App.askai.buildAskAIText(q, order, answer.chosen, answer.confidence);
+          App.askai.copyText(text).then(
+            function () { App.toast('คัดลอกแล้ว เปิด Claude เพื่อวาง'); window.open('https://claude.ai', '_blank', 'noopener'); },
+            function () { App.toast('คัดลอกไม่สำเร็จ'); }
+          );
+        }
+      }),
+      el('button', {
+        class: 'btn btn-primary',
+        text: 'แชท AI',
+        onclick: function () {
+          App.chat.open(q, order, answer);
+        }
+      }),
+      el('button', {
+        class: 'btn btn-ghost',
+        text: 'แก้ไขข้อนี้',
+        onclick: function () { window.location.hash = '#/manage?edit=' + encodeURIComponent(q.id); }
+      })
     ]);
     wrap.appendChild(aiRow);
 
@@ -384,7 +400,6 @@
     App.storage.setSessions(sessions);
     App.storage.setActiveSession(null);
 
-    // Request persistent storage once after first session
     if (sessions.length === 1) App.scheduler.ensurePersist();
 
     App.views.summary.setLast(summary);
