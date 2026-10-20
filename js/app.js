@@ -2,7 +2,7 @@
 (function () {
   window.App = window.App || {};
 
-  var routes = ['home', 'session', 'summary', 'stats', 'manage', 'settings'];
+  var routes = ['home', 'session', 'summary', 'stats', 'manage', 'settings', 'flashcards'];
 
   function parseHash() {
     var hash = window.location.hash || '#/home';

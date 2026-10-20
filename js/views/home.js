@@ -1,4 +1,4 @@
-/* Home view — smart start + goal ring + backup banner */
+/* Home view — smart start + goal ring + backup banner + flashcards */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
@@ -65,7 +65,7 @@
     if (questions.length === 0) {
       root.appendChild(el('div', { class: 'card' }, [
         el('h2', { text: 'ยินดีต้อนรับ' }),
-        el('p', { class: 'muted', text: 'ยังไม่มีข้อสอบในระบบ เริ่มได้ด้วยการโหลดตัวอย่าง เพิ่มเอง หรือนำเข้าไฟล์' }),
+        el('p', { class: 'muted', text: 'ยังไม่มีข้อสอบในระบบ เริ่มได้ด้วยการโหลดตัวอย่าง เพิ่มเอง หรือนำเข้าจากไฟล์' }),
         el('div', { class: 'stack' }, [
           el('button', { class: 'btn btn-primary btn-block', text: 'โหลดข้อสอบตัวอย่าง (20 ข้อ)', onclick: function () {
             var existing = App.loadQuestions();
@@ -128,6 +128,15 @@
           if (!result.ids.length) { App.toast('ไม่มีข้อสอบให้ฝึก'); return; }
           App.views.session.startNew(result.ids, result.meta);
           App.render();
+        }
+      }),
+      // ✅ เพิ่มปุ่มแฟลชการ์ดตรงนี้
+      el('button', {
+        class: 'btn btn-block',
+        style: 'margin-top:8px;',
+        text: '🃏 ฝึกแฟลชการ์ด',
+        onclick: function () {
+          window.location.hash = '#/flashcards';
         }
       })
     ]));
