@@ -1,4 +1,4 @@
-/* Round 2 scheduler tests — Node */
+/* Round 3 scheduler tests — Node */
 const assert = require('assert');
 const path = require('path');
 
@@ -77,12 +77,10 @@ const S = App.scheduler;
     now: new Date(2025, 0, 15, 10).getTime(),
     rng: function () { return 0.5; }
   });
-  
   var newCount = res.ids.filter(function (id) {
     var num = parseInt(id.replace('q', ''), 10);
     return num >= 30;
   }).length;
-  
   assert.ok(newCount <= 6, 'new questions capped at 60% (got ' + newCount + ')');
 })();
 
@@ -102,17 +100,13 @@ const S = App.scheduler;
   var qs = [];
   for (var i = 0; i < 10; i++) qs.push({ id: 'weak-' + i, subject: 'data-engineering', topic: 'weak' });
   for (var j = 0; j < 10; j++) qs.push({ id: 'strong-' + j, subject: 'data-engineering', topic: 'strong' });
-  
   var progress = {};
-  // strong: mastered, not due
   for (var k = 0; k < 10; k++) {
     progress['strong-' + k] = { box: 4, due: '2030-01-01', attempts: 5, correct: 5, lapses: 0, lastAt: Date.now() };
   }
-  // weak: have been done (so not "new"), but lapses >= 2, not due
   for (var w = 0; w < 10; w++) {
     progress['weak-' + w] = { box: 1, due: '2030-01-01', attempts: 3, correct: 1, lapses: 2, lastAt: Date.now() };
   }
-
   var topicRecent = {
     'data-engineering|weak': [0.2, 0.3, 0.1, 0.2, 0.3],
     'data-engineering|strong': [0.95, 1.0, 0.9, 0.95, 1.0]
@@ -150,4 +144,27 @@ const S = App.scheduler;
   assert.strictEqual(S.classifyAnswer(false, 'guess'), 'wrong');
 })();
 
-console.log('Round 2 tests passed.');
+// ---- Backup Banner Logic ----
+(function testBackupBanner() {
+  var now = Date.now();
+  
+  // Case 1: Not enough activity -> false
+  assert.strictEqual(S.shouldShowBackupBanner({ answeredTotal: 10, addedQuestions: 5, lastBackupAt: null, now: now }), false);
+  
+  // Case 2: Enough activity, never backed up -> true
+  assert.strictEqual(S.shouldShowBackupBanner({ answeredTotal: 25, addedQuestions: 0, lastBackupAt: null, now: now }), true);
+  
+  // Case 3: Enough activity, backed up 8 days ago -> true
+  var eightDaysAgo = now - (8 * 24 * 60 * 60 * 1000);
+  assert.strictEqual(S.shouldShowBackupBanner({ answeredTotal: 25, addedQuestions: 0, lastBackupAt: eightDaysAgo, now: now }), true);
+
+  // Case 4: Enough activity, backed up 2 days ago -> false
+  var twoDaysAgo = now - (2 * 24 * 60 * 60 * 1000);
+  assert.strictEqual(S.shouldShowBackupBanner({ answeredTotal: 25, addedQuestions: 0, lastBackupAt: twoDaysAgo, now: now }), false);
+
+  // Case 5: Snoozed -> false
+  var tomorrow = now + (1 * 24 * 60 * 60 * 1000);
+  assert.strictEqual(S.shouldShowBackupBanner({ answeredTotal: 25, addedQuestions: 0, lastBackupAt: null, backupSnoozeUntil: tomorrow, now: now }), false);
+})();
+
+console.log('Round 3 tests passed.');

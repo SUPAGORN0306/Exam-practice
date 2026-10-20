@@ -1,15 +1,25 @@
-/* Session view — with recheck injection, confidence, timers, recordDaily/topicRecent */
+/* Session view — timers (untimed/timed), visibility pause, per-question timing */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
 
   var LETTERS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ'];
+  var timerInterval = null;
+  var questionStartAt = null;
+  var sessionElapsedMs = 0;
+  var overtimeStarted = false;
+  var hiddenAt = null;
 
   function findQuestion(qid) {
     return App.loadQuestions().find(function (q) { return q.id === qid; });
   }
 
+  function clearTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  }
+
   function startNew(ids, meta) {
+    clearTimer();
     var questions = App.loadQuestions();
     var byId = {};
     questions.forEach(function (q) { byId[q.id] = q; });
@@ -25,6 +35,9 @@
       }
     });
 
+    var timerMode = settings.timerMode === 'timed' ? 'timed' : 'untimed';
+    var totalMs = timerMode === 'timed' ? (ids.length * (settings.secondsPerQuestion || 60) * 1000) : 0;
+
     var session = {
       id: 's-' + Date.now(),
       startedAt: Date.now(),
@@ -35,12 +48,22 @@
       index: 0,
       choiceOrders: choiceOrders,
       answers: [],
-      timer: { mode: 'untimed', totalMs: 0, elapsedMs: 0, overtime: false },
+      timer: { mode: timerMode, totalMs: totalMs, elapsedMs: 0, overtime: false },
       recheckCount: {},
       meta: meta || {}
     };
     App.storage.setActiveSession(session);
+    sessionElapsedMs = 0;
+    overtimeStarted = false;
     App.navigate('session');
+    App.render();
+  }
+
+  function formatMs(ms) {
+    var s = Math.floor(ms / 1000);
+    var m = Math.floor(s / 60);
+    var sec = s % 60;
+    return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
   }
 
   function renderSession(root) {
@@ -53,7 +76,6 @@
       ]));
       return;
     }
-
     var current = session.queue[session.index];
     if (!current) { finishSession(session); return; }
     var q = findQuestion(current.qid);
@@ -67,17 +89,53 @@
     var order = session.choiceOrders[q.id] || q.choices.map(function (_, i) { return i; });
     var existing = session.answers.find(function (a) { return a.qid === q.id && !a.isRecheck; });
 
-    // Top bar
+    // --- Top bar with timer ---
+    var timerEl = el('div', {
+      class: 'small muted',
+      style: 'font-variant-numeric: tabular-nums; min-width:60px; text-align:right;',
+      text: formatMs(sessionElapsedMs || session.timer.elapsedMs || 0)
+    });
     var pct = Math.round((session.index / session.n) * 100);
     root.appendChild(el('div', { class: 'session-top' }, [
       el('button', { class: 'icon-btn', 'aria-label': 'ออก', text: '✕', onclick: function () {
-        if (App.confirm('ความคืบหน้าจะถูกเก็บไว้ ต้องการออกหรือไม่?')) App.navigate('home');
+        if (App.confirm('ความคืบหน้าจะถูกเก็บไว้ ต้องการออกหรือไม่?')) {
+          clearTimer();
+          var s = App.storage.getActiveSession();
+          if (s) { s.timer.elapsedMs = sessionElapsedMs; App.storage.setActiveSession(s); }
+          App.navigate('home');
+        }
       }}),
       el('div', { class: 'small muted', text: (session.index + 1) + ' / ' + session.n }),
+      timerEl,
       el('div', { class: 'progress-bar' }, [el('div', { class: 'fill', style: 'width:' + pct + '%' })])
     ]));
 
-    // Question
+    // --- Timer tick ---
+    clearTimer();
+    var questionStart = Date.now();
+    var answerCommitAt = null;
+    timerInterval = setInterval(function () {
+      if (hiddenAt) return;
+      sessionElapsedMs += 1000;
+      if (session.timer.mode === 'timed' && !overtimeStarted && sessionElapsedMs >= session.timer.totalMs) {
+        overtimeStarted = true;
+        showOvertimeModal(session);
+      }
+      var remainOrElapsed = session.timer.mode === 'timed' && !overtimeStarted
+        ? (session.timer.totalMs - sessionElapsedMs)
+        : sessionElapsedMs;
+      timerEl.textContent = formatMs(Math.max(0, remainOrElapsed));
+    }, 1000);
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    function handleVisibility() {
+      if (document.hidden) { hiddenAt = Date.now(); }
+      else if (hiddenAt) {
+        hiddenAt = null;
+      }
+    }
+
+    // --- Question card ---
     var card = el('div', { class: 'card' }, [
       el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic }),
       el('p', { style: 'font-size:var(--font-question); white-space:pre-wrap; word-break:break-word; margin-top:8px;', text: q.question })
@@ -135,25 +193,26 @@
       if (!question) return;
       var correct = chosen === question.answer;
       var type = App.scheduler.classifyAnswer(correct, confidence);
+      var timeMs = Date.now() - questionStart;
 
       var answer = {
         qid: question.id, chosen: chosen, correct: correct, confidence: confidence,
-        timeMs: 0, cause: null, isRecheck: cq.isRecheck === true, type: type
+        timeMs: timeMs, cause: null, isRecheck: cq.isRecheck === true, type: type
       };
 
       if (!answer.isRecheck) {
-        // Update progress
         var progress = App.storage.getProgress();
-        progress[question.id] = App.scheduler.nextBox(progress[question.id], type, Date.now());
-        progress[question.id].lastConfidence = confidence;
+        var prev = progress[question.id] || {};
+        var nbox = App.scheduler.nextBox(prev, type, Date.now());
+        nbox.lastConfidence = confidence;
+        nbox.lastTimeMs = timeMs;
+        nbox.avgTimeMs = prev.avgTimeMs ? Math.round((prev.avgTimeMs + timeMs) / 2) : timeMs;
+        progress[question.id] = nbox;
         App.storage.setProgress(progress);
 
-        // Daily
-        App.recordDaily(question, confidence, correct, 0);
-        // Topic recent
+        App.recordDaily(question, confidence, correct, timeMs);
         App.recordTopicScore(question, type);
 
-        // Insert recheck if wrong
         if (!correct) {
           var rechecks = s.recheckCount[question.id] || 0;
           if (rechecks < 2) {
@@ -162,12 +221,13 @@
           }
         }
       } else {
-        // Recheck: no box change, no score
-        App.recordDaily(question, confidence, correct, 0);
+        App.recordDaily(question, confidence, correct, timeMs);
       }
 
       s.answers.push(answer);
+      s.timer.elapsedMs = sessionElapsedMs;
       App.storage.setActiveSession(s);
+      clearTimer();
       renderSession(root);
     }
 
@@ -180,6 +240,20 @@
     card.appendChild(choicesWrap);
     root.appendChild(card);
     root.appendChild(bottomWrap);
+  }
+
+  function showOvertimeModal(session) {
+    var s = App.storage.getActiveSession();
+    if (!s || s.timer.overtime) return;
+    s.timer.overtime = true;
+    App.storage.setActiveSession(s);
+    var ans = window.confirm('หมดเวลาแล้ว ทำต่อหรือจบชุด?\n\nOK = ทำต่อ (นับเวลาต่อแบบนับขึ้น)\nCancel = จบชุดและดูสรุป');
+    if (!ans) {
+      clearTimer();
+      finishSession(s);
+    } else {
+      // Continue in overtime; timer switches to count-up automatically via session.timer.overtime
+    }
   }
 
   function buildReveal(q, order, answer) {
@@ -197,7 +271,6 @@
         ])
       ])
     );
-
     if (!isCorrect) wrap.appendChild(el('p', { class: 'small muted', text: 'ข้อนี้จะกลับมาอีกครั้งในชุดนี้' }));
 
     wrap.appendChild(
@@ -273,7 +346,7 @@
         if (!cur) return;
         cur.index = cur.index + 1;
         App.storage.setActiveSession(cur);
-        if (cur.index >= cur.queue.length) finishSession(cur);
+        if (cur.index >= cur.queue.length) { clearTimer(); finishSession(cur); }
         else App.render();
       }
     }));
@@ -282,6 +355,7 @@
   }
 
   function finishSession(session) {
+    clearTimer();
     var first = session.answers.filter(function (a) { return !a.isRecheck; });
     var rechecks = session.answers.filter(function (a) { return a.isRecheck; });
     var correct = first.filter(function (a) { return a.correct; }).length;
@@ -300,14 +374,19 @@
       durationMs: Date.now() - session.startedAt,
       recheckTotal: rechecks.length,
       recheckCorrect: rechecks.filter(function (a) { return a.correct; }).length,
-      // Detail for summary view
-      firstAnswers: first.map(function (a) { return { qid: a.qid, correct: a.correct, confidence: a.confidence, chosen: a.chosen, type: a.type }; })
+      firstAnswers: first.map(function (a) {
+        return { qid: a.qid, correct: a.correct, confidence: a.confidence, chosen: a.chosen, type: a.type, timeMs: a.timeMs };
+      })
     };
     var sessions = App.storage.getSessions();
     sessions.unshift(summary);
     if (sessions.length > 100) sessions.length = 100;
     App.storage.setSessions(sessions);
     App.storage.setActiveSession(null);
+
+    // Request persistent storage once after first session
+    if (sessions.length === 1) App.scheduler.ensurePersist();
+
     App.views.summary.setLast(summary);
     App.navigate('summary');
   }

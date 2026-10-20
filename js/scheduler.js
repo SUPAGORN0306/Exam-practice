@@ -1,15 +1,15 @@
-/* Scheduler — Leitner box + weighted session builder + recheck injection */
+/* Scheduler — Leitner + weighted builder + recheck + backup hint helpers */
 (function () {
   window.App = window.App || {};
 
-  // ---------- Constants ----------
   var INTERVAL_DAYS = [0, 1, 3, 7, 14, 30];
   var MASTERED_BOX = 4;
   var TOPIC_WINDOW = 20;
   var TOPIC_MIN_SAMPLES = 5;
   var DAY_START_HOUR = 4;
+  var BACKUP_QUIET_DAYS = 3;
+  var BACKUP_STALE_DAYS = 7;
 
-  // ---------- Date helpers ----------
   function todayKey(ts) {
     var t = (typeof ts === 'number') ? ts : Date.now();
     var d = new Date(t - DAY_START_HOUR * 60 * 60 * 1000);
@@ -28,7 +28,6 @@
     return y + '-' + m + '-' + day;
   }
 
-  // ---------- Classification ----------
   function classifyAnswer(correct, confidence) {
     if (correct) {
       if (confidence === 'sure') return 'correctSure';
@@ -47,7 +46,6 @@
     }
   }
 
-  // ---------- Box update ----------
   function nextBox(prevProgress, type, ts) {
     var p = Object.assign({
       box: 0, due: null, attempts: 0, correct: 0, lapses: 0,
@@ -69,7 +67,6 @@
       p.due = addDays(today, INTERVAL_DAYS[1]);
       p.correct = (p.correct || 0) + 1;
     } else {
-      // wrong / wrongSure
       p.box = 0;
       p.due = today;
       p.lapses = (p.lapses || 0) + 1;
@@ -78,18 +75,16 @@
     return p;
   }
 
-  // ---------- Topic accuracy ----------
   function topicKey(subject, topic) { return subject + '|' + topic; }
 
   function topicAccuracy(scores) {
-    if (!scores || !scores.length) return null; 
+    if (!scores || !scores.length) return null;
     if (scores.length < TOPIC_MIN_SAMPLES) return null;
     var s = 0;
     for (var i = 0; i < scores.length; i++) s += scores[i];
     return s / scores.length;
   }
 
-  // ---------- Weighted random without replacement ----------
   function weightedSampleNoReplace(pool, weights, k, rng) {
     rng = rng || Math.random;
     var items = pool.map(function (item, i) { return { item: item, w: weights[i] }; });
@@ -110,7 +105,6 @@
     return picked;
   }
 
-  // ---------- Build auto session ----------
   function buildAutoSession(opts) {
     var questions = opts.questions || [];
     var progress = opts.progress || {};
@@ -120,34 +114,28 @@
     var rng = opts.rng || Math.random;
     var today = todayKey(opts.now);
 
-    // Filter pool by subject/topics
     var inScope = questions.filter(function (q) {
       if (filter.subject && q.subject !== filter.subject) return false;
       if (filter.topics && filter.topics.length && filter.topics.indexOf(q.topic) === -1) return false;
       return true;
     });
-
     if (inScope.length === 0) {
       return { ids: [], meta: { dueCount: 0, filled: 0, newCount: 0, totalInLibrary: 0, empty: true } };
     }
 
-    // Split due vs rest
-    var due = [];
-    var rest = [];
+    var due = [], rest = [];
     inScope.forEach(function (q) {
       var p = progress[q.id];
       if (p && p.due && p.due <= today) due.push(q);
       else rest.push(q);
     });
 
-    // Sort due: oldest due first, then lower box first
     due.sort(function (a, b) {
       var pa = progress[a.id], pb = progress[b.id];
       if (pa.due !== pb.due) return pa.due < pb.due ? -1 : 1;
       return (pa.box || 0) - (pb.box || 0);
     });
 
-    // Round-robin due across subjects
     var dueBySubject = {};
     due.forEach(function (q) {
       (dueBySubject[q.subject] = dueBySubject[q.subject] || []).push(q);
@@ -173,11 +161,9 @@
     var chosen = dueOrdered.slice(0, n);
     var remain = n - chosen.length;
 
-    // Fill from rest with weights
     if (remain > 0 && rest.length > 0) {
       var newCap = Math.max(0, Math.floor(n * 0.6) - chosen.filter(function (q) { return !progress[q.id]; }).length);
       var newChosen = 0;
-
       var weights = rest.map(function (q) {
         var p = progress[q.id];
         var tk = topicKey(q.subject, q.topic);
@@ -189,10 +175,7 @@
         if (p && (p.lapses || 0) >= 2) w *= 1.5;
         return w;
       });
-
-      // Filter BEFORE picking to ensure cap is never exceeded
-      var filteredPickable = [];
-      var filteredWeights = [];
+      var filteredPickable = [], filteredWeights = [];
       for (var j = 0; j < rest.length; j++) {
         var q = rest[j];
         var isNew = !progress[q.id];
@@ -201,14 +184,11 @@
         filteredPickable.push(q);
         filteredWeights.push(weights[j]);
       }
-
       var filled = weightedSampleNoReplace(filteredPickable, filteredWeights, remain, rng);
       filled.forEach(function (q) { chosen.push(q); });
     }
 
-    // Interleave to avoid >2 same subject in a row (best effort)
     var ordered = interleaveSubjects(chosen, 2);
-
     var newCount = ordered.filter(function (q) { return !progress[q.id]; }).length;
     return {
       ids: ordered.map(function (q) { return q.id; }),
@@ -222,7 +202,6 @@
     };
   }
 
-  // Best-effort interleave
   function interleaveSubjects(list, maxRun) {
     if (list.length <= 1) return list.slice();
     var remaining = list.slice();
@@ -245,7 +224,6 @@
     return out;
   }
 
-  // ---------- Review mistakes mode ----------
   function buildReviewWrongSession(opts) {
     var questions = opts.questions || [];
     var progress = opts.progress || {};
@@ -269,7 +247,6 @@
     };
   }
 
-  // ---------- Add recheck to queue ----------
   function injectRecheck(queue, qid, atIndex, rng) {
     rng = rng || Math.random;
     var offset = 3 + Math.floor(rng() * 3);
@@ -280,7 +257,6 @@
     return copy;
   }
 
-  // ---------- Shuffle choices ----------
   function shuffleChoices(len, rng) {
     rng = rng || Math.random;
     var a = [];
@@ -292,12 +268,40 @@
     return a;
   }
 
+  // ---- Storage persistence (silent, best-effort) ----
+  function ensurePersist() {
+    try {
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().catch(function () {});
+      }
+    } catch (e) {}
+  }
+
+  // ---- Backup banner condition ----
+  function shouldShowBackupBanner(opts) {
+    var answeredTotal = opts.answeredTotal || 0;
+    var addedQuestions = opts.addedQuestions || 0;
+    var lastBackupAt = opts.lastBackupAt;
+    var snoozeUntil = opts.backupSnoozeUntil;
+    var now = opts.now || Date.now();
+    if (snoozeUntil && now < snoozeUntil) return false;
+    if (!(answeredTotal >= 20 || addedQuestions >= 10)) return false;
+    if (!lastBackupAt) return true;
+    var days = (now - lastBackupAt) / (24 * 60 * 60 * 1000);
+    return days > BACKUP_STALE_DAYS;
+  }
+
+  function snoozeBannerDays() {
+    return Date.now() + BACKUP_QUIET_DAYS * 24 * 60 * 60 * 1000;
+  }
+
   App.scheduler = {
     INTERVAL_DAYS: INTERVAL_DAYS,
     MASTERED_BOX: MASTERED_BOX,
     TOPIC_WINDOW: TOPIC_WINDOW,
     TOPIC_MIN_SAMPLES: TOPIC_MIN_SAMPLES,
     DAY_START_HOUR: DAY_START_HOUR,
+    BACKUP_QUIET_DAYS: BACKUP_QUIET_DAYS,
 
     todayKey: todayKey,
     addDays: addDays,
@@ -311,6 +315,10 @@
     buildReviewWrongSession: buildReviewWrongSession,
     injectRecheck: injectRecheck,
     shuffleChoices: shuffleChoices,
-    interleaveSubjects: interleaveSubjects
+    interleaveSubjects: interleaveSubjects,
+
+    ensurePersist: ensurePersist,
+    shouldShowBackupBanner: shouldShowBackupBanner,
+    snoozeBannerDays: snoozeBannerDays
   };
 })();

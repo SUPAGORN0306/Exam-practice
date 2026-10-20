@@ -1,4 +1,4 @@
-/* Stats helpers — daily streak, mastery %, next-day due count */
+/* Stats helpers */
 (function () {
   window.App = window.App || {};
 
@@ -10,7 +10,6 @@
     var day = String(d.getDate()).padStart(2, '0');
     return y + '-' + m + '-' + day;
   }
-
   function prevDayKey(key) {
     var p = key.split('-').map(Number);
     var d = new Date(p[0], p[1] - 1, p[2]);
@@ -20,7 +19,6 @@
     var day = String(d.getDate()).padStart(2, '0');
     return y + '-' + m + '-' + day;
   }
-
   function dailyAnsweredCount(daily, dayKey) {
     var d = daily[dayKey];
     if (!d) return 0;
@@ -32,13 +30,10 @@
     });
     return total;
   }
-
-  // Streak = consecutive days with >=5 answers (counting back from today or yesterday)
   function streakDays(daily, todayK) {
     var t = todayK || todayKey();
     var count = 0;
     var cursor = t;
-    // If today has <5, streak ends yesterday (no freeze per spec)
     if (dailyAnsweredCount(daily, cursor) >= 5) {
       count = 1;
       cursor = prevDayKey(cursor);
@@ -51,8 +46,6 @@
     }
     return count;
   }
-
-  // Mastery = (# q with box >= MASTERED) / (# total in subject)
   function subjectMastery(questions, progress, subject) {
     var total = 0, mastered = 0;
     questions.forEach(function (q) {
@@ -63,8 +56,6 @@
     });
     return { total: total, mastered: mastered, pct: total ? mastered / total : 0 };
   }
-
-  // Due count today (due <= today)
   function dueTodayCount(questions, progress, todayK, filter) {
     filter = filter || {};
     var t = todayK || todayKey();
@@ -76,8 +67,6 @@
     });
     return n;
   }
-
-  // Due count tomorrow
   function dueTomorrowCount(questions, progress, todayK, filter) {
     filter = filter || {};
     var t = todayK || todayKey();
@@ -90,8 +79,6 @@
     });
     return n;
   }
-
-  // Slow questions: >2x median for that subject, requires >=5 samples
   function slowQuestions(subject, progress, questions) {
     var times = [];
     questions.forEach(function (q) {
@@ -120,6 +107,88 @@
     return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
   }
 
+  // --- Round 3: extra helpers ---
+  function overallCounts(questions, progress) {
+    var total = questions.length;
+    var mastered = 0, learning = 0, untouched = 0;
+    questions.forEach(function (q) {
+      var p = progress[q.id];
+      if (!p) untouched++;
+      else if ((p.box || 0) >= 4) mastered++;
+      else learning++;
+    });
+    return { total: total, mastered: mastered, learning: learning, untouched: untouched };
+  }
+
+  // 30-day daily accuracy per subject
+  // Returns { days: [ 'YYYY-MM-DD', ...], series: { subject: [ {answered, correct} ] } }
+  function dailyAccuracy30(questions, progress, sessions, subjectList, todayK) {
+    var t = todayK || todayKey();
+    var days = [];
+    for (var i = 29; i >= 0; i--) days.push(App.scheduler.addDays(t, -i));
+
+    // Build per-subject map: session -> day
+    var byId = {};
+    questions.forEach(function (q) { byId[q.id] = q; });
+    var daily = {}; // { dayKey: { subject: {n, correct} } }
+    days.forEach(function (d) { daily[d] = {}; });
+
+    sessions.forEach(function (s) {
+      if (!s.endedAt) return;
+      var d = todayKey(s.endedAt);
+      if (!daily[d]) return;
+      var firsts = s.firstAnswers || [];
+      firsts.forEach(function (fa) {
+        var q = byId[fa.qid];
+        if (!q) return;
+        if (!daily[d][q.subject]) daily[d][q.subject] = { n: 0, correct: 0 };
+        daily[d][q.subject].n++;
+        if (fa.correct) daily[d][q.subject].correct++;
+      });
+    });
+
+    var series = {};
+    subjectList.forEach(function (sub) {
+      series[sub] = days.map(function (d) {
+        var cell = daily[d][sub];
+        if (!cell || !cell.n) return null;
+        return { n: cell.n, correct: cell.correct, pct: cell.correct / cell.n };
+      });
+    });
+    return { days: days, series: series };
+  }
+
+  function topicAccuracyList(questions, progress, topicRecent) {
+    // Returns per subject: array of { topic, accuracy|null, n }
+    var bySubject = {};
+    questions.forEach(function (q) {
+      bySubject[q.subject] = bySubject[q.subject] || {};
+      bySubject[q.subject][q.topic] = (bySubject[q.subject][q.topic] || 0) + 1;
+    });
+    var result = {};
+    Object.keys(bySubject).forEach(function (subj) {
+      result[subj] = Object.keys(bySubject[subj]).map(function (topic) {
+        var key = App.scheduler.topicKey(subj, topic);
+        var scores = (topicRecent[key] || []).slice(-App.scheduler.TOPIC_WINDOW);
+        var acc = App.scheduler.topicAccuracy(scores);
+        return { topic: topic, accuracy: acc, n: bySubject[subj][topic], samples: scores.length };
+      });
+    });
+    return result;
+  }
+
+  function wrongSureLast30(sessions, todayK) {
+    var t = todayK || todayKey();
+    var cutoff = App.scheduler.addDays(t, -29);
+    var total = 0;
+    sessions.forEach(function (s) {
+      if (!s.endedAt) return;
+      var d = todayKey(s.endedAt);
+      if (d >= cutoff) total += (s.wrongSure || 0);
+    });
+    return total;
+  }
+
   App.stats = {
     todayKey: todayKey,
     prevDayKey: prevDayKey,
@@ -129,6 +198,11 @@
     dueTodayCount: dueTodayCount,
     dueTomorrowCount: dueTomorrowCount,
     slowQuestions: slowQuestions,
-    median: median
+    median: median,
+
+    overallCounts: overallCounts,
+    dailyAccuracy30: dailyAccuracy30,
+    topicAccuracyList: topicAccuracyList,
+    wrongSureLast30: wrongSureLast30
   };
 })();
