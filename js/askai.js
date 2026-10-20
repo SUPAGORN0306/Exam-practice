@@ -14,16 +14,20 @@
     lines.push('โจทย์: ' + q.question);
     lines.push('');
     lines.push('ตัวเลือก:');
-    choiceOrder.forEach(function (origIdx, displayIdx) {
+    
+    // 🔥 fallback ถ้า choiceOrder ไม่มี
+    var order = choiceOrder || q.choices.map(function (_, i) { return i; });
+    order.forEach(function (origIdx, displayIdx) {
       lines.push(letter(displayIdx) + '. ' + q.choices[origIdx]);
     });
+    
     lines.push('');
     if (typeof chosen === 'number' && chosen >= 0) {
-      var displayChosen = choiceOrder.indexOf(chosen);
+      var displayChosen = order.indexOf(chosen);
       lines.push('คำตอบที่ฉันเลือก: ' + letter(displayChosen) + '. ' + q.choices[chosen] +
         ' (ความมั่นใจ: ' + ({ sure: 'มั่นใจ', unsure: 'ไม่แน่ใจ', guess: 'เดา' }[confidence] || '-') + ')');
     }
-    var displayAnswer = choiceOrder.indexOf(q.answer);
+    var displayAnswer = order.indexOf(q.answer);
     lines.push('เฉลยที่ถูกต้อง: ' + letter(displayAnswer) + '. ' + q.choices[q.answer]);
     lines.push('คำอธิบายเดิมของฉัน: ' + q.explanation);
     lines.push('');
@@ -31,23 +35,32 @@
     return lines.join('\n');
   }
 
+  // ==========================================
+  // 🔥 PROMPT TEMPLATE (สำหรับสร้างข้อสอบใหม่)
+  // ==========================================
   var PROMPT_TEMPLATE = [
-    'ช่วยร่างข้อสอบปรนัยจากเนื้อหาด้านล่าง',
-    'วิชา (ใช้ค่านี้ในฟิลด์ subject): [data-engineering | marketing-innovation | feature-engineering | ai-digital-essentials]',
-    'บท: [ชื่อบท]',
-    'จำนวน: [10] ข้อ',
-    'ระดับความยาก: [1-3]',
+    'คุณคือผู้เชี่ยวชาญด้านการออกข้อสอบ (Assessment Designer)',
     '',
-    'กติกา:',
-    '- ตอบเป็น JSON อาร์เรย์เท่านั้น ห้ามมีข้อความอื่นนอก JSON',
-    '- แต่ละข้อมีฟิลด์: subject, topic, question, choices (4 ข้อ), answer (เลขตำแหน่งที่ถูก เริ่มที่ 0), explanation, whyWrong (อาร์เรย์ยาว 4 ช่อง ช่องของข้อที่ถูกเป็น null), difficulty',
-    '- ตัวเลือกผิดต้องฟังดูสมเหตุสมผล สะท้อนความเข้าใจผิดที่พบบ่อย',
-    '- ไม่มีโค้ดหรือรูปในโจทย์ ใช้ข้อความล้วน',
-    '- ตอบถูกได้ข้อเดียวเท่านั้น',
-    '- เนื้อหาต้องอ้างอิงจากเนื้อหาที่ให้เท่านั้น',
+    '== ข้อมูลนำเข้า ==',
+    'วิชา: [ระบุรหัสวิชา: data-engineering | marketing-innovation | feature-engineering | ai-digital-essentials]',
+    'บทเรียน: [ระบุชื่อบท]',
+    'จำนวนข้อ: [ระบุจำนวน เช่น 10]',
+    'ระดับความยาก: [1 = ง่าย, 2 = ปานกลาง, 3 = ยาก]',
     '',
-    'เนื้อหา:',
-    '[วางโน้ตหรือสไลด์ที่นี่]'
+    '== เนื้อหาอ้างอิง ==',
+    '[วางโน้ต สไลด์ หรือเนื้อหาที่ต้องการให้ออกข้อสอบตรงนี้]',
+    '',
+    '== กติกาการสร้างข้อสอบ (สำคัญมาก) ==',
+    '1. ตอบเป็น JSON Array เท่านั้น ห้ามมีข้อความเกริ่นนำหรือปิดท้าย',
+    '2. แต่ละข้อต้องมีฟิลด์ครบ: subject, topic, question, choices (4 ตัวเลือก), answer (index 0-3), explanation, whyWrong (array 4 ช่อง), difficulty',
+    '3. ตัวเลือกที่ผิด (Distractors): ต้องดูสมเหตุสมผล และสะท้อน misconception หรือความเข้าใจผิดที่พบบ่อย',
+    '4. คำอธิบาย (explanation): ต้องอธิบายว่าทำไมคำตอบนั้นถูก โดยอ้างอิงหลักการหรือเหตุผล',
+    '5. whyWrong: ต้องอธิบายว่าทำไมตัวเลือกอื่นถึงผิด (ถ้าเป็นตัวเลือกที่ถูกให้ใส่ null)',
+    '6. หลีกเลี่ยงคำถามที่ตอบได้ด้วยการเดา หรือใช้ความรู้ทั่วไปโดยไม่ต้องอ่านเนื้อหา',
+    '7. ต้องมีคำตอบที่ถูกต้องเพียง 1 ข้อเท่านั้น',
+    '8. ห้ามใช้รูปภาพ โค้ดยาวๆ หรือตาราง ให้ใช้ข้อความล้วน',
+    '',
+    '== เริ่มสร้างข้อสอบตามเนื้อหาข้างต้น =='
   ].join('\n');
 
   function copyText(text) {
@@ -74,9 +87,11 @@
 
   function getApiKey() { return App.storage.get('apiKey', ''); }
   function setApiKey(k) { return App.storage.set('apiKey', k); }
+  
   function getModel() {
     var s = App.storage.getSettings();
-    return s.aiModel || 'claude-haiku-5-5';
+    // 🔥 แก้ชื่อโมเดลให้ถูกต้อง
+    return s.aiModel || 'claude-3-5-haiku-20241022';
   }
   function setModel(m) {
     var s = App.storage.getSettings();
@@ -93,15 +108,19 @@
     ctx.push('โจทย์: ' + q.question);
     ctx.push('');
     ctx.push('ตัวเลือก:');
-    choiceOrder.forEach(function (origIdx, displayIdx) {
+    
+    // 🔥 fallback ถ้า choiceOrder ไม่มี
+    var order = choiceOrder || q.choices.map(function (_, i) { return i; });
+    order.forEach(function (origIdx, displayIdx) {
       ctx.push(letter(displayIdx) + '. ' + q.choices[origIdx]);
     });
+    
     if (typeof chosen === 'number' && chosen >= 0) {
-      var displayChosen = choiceOrder.indexOf(chosen);
+      var displayChosen = order.indexOf(chosen);
       ctx.push('คำตอบที่ผู้ใช้เลือก: ' + letter(displayChosen) + '. ' + q.choices[chosen] +
         ' (ความมั่นใจ: ' + ({ sure: 'มั่นใจ', unsure: 'ไม่แน่ใจ', guess: 'เดา' }[confidence] || '-') + ')');
     }
-    var displayAnswer = choiceOrder.indexOf(q.answer);
+    var displayAnswer = order.indexOf(q.answer);
     ctx.push('เฉลย: ' + letter(displayAnswer) + '. ' + q.choices[q.answer]);
     ctx.push('คำอธิบายเดิม: ' + q.explanation);
     ctx.push('');
@@ -156,11 +175,14 @@
     });
   }
 
+  // ==========================================
+  // 🔥 QUICK PROMPTS (สำหรับปุ่มลัดในหน้าแชท)
+  // ==========================================
   var QUICK_PROMPTS = {
-    explain: 'อธิบายข้อนี้ให้เข้าใจง่ายขึ้น โดยไม่ต้องบอกเฉลยตรง ๆ',
-    whyWrong: 'ทำไมตัวเลือกที่ฉันเลือกถึงผิด และตัวเลือกที่ถูกต้องต่างกันอย่างไร',
-    example: 'ยกตัวอย่างจริงที่ช่วยให้เข้าใจแนวคิดของข้อนี้',
-    newQuestion: 'ออกข้อใหม่แนวเดียวกันกับข้อนี้ 1 ข้อ ในรูปแบบ JSON ตาม schema ของข้อสอบ (subject, topic, question, choices, answer, explanation, whyWrong, difficulty) ตอบเป็น JSON อาร์เรย์เท่านั้น'
+    explain: 'ช่วยอธิบายโจทย์ข้อนี้ให้เข้าใจง่ายขึ้น โดยไม่ต้องบอกเฉลยตรงๆ ให้คำใบ้ที่นำไปสู่การคิดวิเคราะห์เอง',
+    whyWrong: 'ทำไมตัวเลือกที่ฉันเลือกถึงผิด และตัวเลือกที่ถูกต้องต่างกันอย่างไร อธิบายหลักการที่เกี่ยวข้องด้วย',
+    example: 'ยกตัวอย่างในชีวิตจริงหรือกรณีศึกษาที่ช่วยให้เข้าใจแนวคิดของข้อนี้ได้ชัดเจนขึ้น',
+    newQuestion: 'ช่วยออกข้อสอบใหม่ 1 ข้อในแนวเดียวกัน (หัวข้อเดียวกัน) ระดับความยากเท่ากัน โดยใช้รูปแบบ JSON ตาม schema ของข้อสอบ (subject, topic, question, choices, answer, explanation, whyWrong, difficulty) ตอบเป็น JSON Array เท่านั้น'
   };
 
   App.askai = {
