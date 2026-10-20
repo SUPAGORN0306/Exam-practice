@@ -141,16 +141,25 @@
   // ==========================================
   function renderScrollMode(root, session) {
     var el = App.el;
-    var s = App.storage.getActiveSession(); // 🔥 ดึงข้อมูลล่าสุดเสมอ
+    var s = App.storage.getActiveSession();
 
     var isTimed = s.timer.mode === 'timed';
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs) });
-    
-    // 🔥 สร้างหลอดและเวลารวมเฉพาะตอน timed
+
+    // 🔥 นับจำนวนข้อที่ตอบแล้ว / ทั้งหมด
+    var answeredCount = s.queue.filter(function (cur) {
+      return s.answers.some(function (a) { 
+        return a.qid === cur.qid && String(a.isRecheck) === String(cur.isRecheck) && a.chosen != null; 
+      });
+    }).length;
+    var answeredCounterEl = el('div', { class: 'small muted', style: 'white-space:nowrap;', text: answeredCount + ' / ' + s.queue.length });
+
+    // 🔥 หลอด Progress แสดงเฉพาะ timed
     var progressFill = el('div', { class: 'fill', style: 'width:0%' });
     var progressBarEl = isTimed ? el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [progressFill]) : null;
     var totalEl = isTimed ? el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: formatMs(s.timer.totalMs) }) : null;
 
+    // 🔥 ประกอบ Top bar
     var topChildren = [
       el('button', {
         class: 'icon-btn', 'aria-label': 'ออก', text: '✕',
@@ -162,7 +171,7 @@
           }
         }
       }),
-      el('div', { class: 'small muted', style: 'white-space:nowrap;', text: 'กระดาษคำตอบ' }),
+      answeredCounterEl,  // 🔥 จำนวนข้อที่ตอบ
       elapsedEl
     ];
     if (progressBarEl) topChildren.push(progressBarEl);
@@ -220,8 +229,15 @@
             activeS.timer.elapsedMs = sessionElapsedMs;
             App.storage.setActiveSession(activeS);
 
-            // 🔥 อัปเดต existing ใน Local
             existing = { qid: q.id, chosen: origIdx, confidence: null, isRecheck: cq.isRecheck, correct: null };
+
+            // 🔥 อัปเดตตัวเลขจำนวนข้อที่ตอบแล้ว
+            var newAnswered = activeS.queue.filter(function (cur) {
+              return activeS.answers.some(function (a) { 
+                return a.qid === cur.qid && String(a.isRecheck) === String(cur.isRecheck) && a.chosen != null; 
+              });
+            }).length;
+            answeredCounterEl.textContent = newAnswered + ' / ' + activeS.queue.length;
           }
         });
         btn.appendChild(el('span', { class: 'choice-tag', text: LETTERS[displayIdx] }));
@@ -299,8 +315,6 @@
   // ==========================================
   function renderButtonMode(root, session) {
     var el = App.el;
-    
-    // 🔥 ดึงข้อมูลล่าสุดจาก Storage เสมอ
     var s = App.storage.getActiveSession();
     var current = s.queue[s.index];
     if (!current) { finishSession(s); return; }
@@ -319,8 +333,8 @@
 
     var isTimed = s.timer.mode === 'timed';
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs) });
-    
-    // 🔥 สร้างหลอดและเวลารวมเฉพาะตอน timed
+
+    // 🔥 หลอดและเวลารวมแสดงเฉพาะ timed
     var progressFill = el('div', { class: 'fill', style: 'width:0%' });
     var progressBarEl = isTimed ? el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [progressFill]) : null;
     var totalEl = isTimed ? el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: formatMs(s.timer.totalMs) }) : null;
