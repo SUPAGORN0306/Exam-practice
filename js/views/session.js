@@ -39,7 +39,8 @@
     if (s) { s.timer.elapsedMs = sessionElapsedMs; App.storage.setActiveSession(s); }
   }
 
-  function startTick(session, elapsedEl) {
+  // 🔥 ปรับ startTick ให้รับ callback อัปเดตหลอด Progress ตามเวลา
+  function startTick(session, elapsedEl, onTick) {
     clearTimer();
     timerInterval = setInterval(function () {
       if (hiddenAt) return;
@@ -49,6 +50,7 @@
         showOvertimeModal(session);
       }
       if (elapsedEl) elapsedEl.textContent = formatMs(sessionElapsedMs);
+      if (onTick) onTick();
       if (sessionElapsedMs - lastSaveMs >= 5000) { lastSaveMs = sessionElapsedMs; saveElapsed(); }
     }, 1000);
   }
@@ -136,20 +138,17 @@
   }
 
   // ==========================================
-  // 🔥 โหมด Scroll 
+  // 🔥 โหมด Scroll (หลอด Progress เป็นเวลา)
   // ==========================================
   function renderScrollMode(root, session) {
     var el = App.el;
-    var s = App.storage.getActiveSession(); // 🔥 ดึงข้อมูลล่าสุดเสมอ
+    var s = App.storage.getActiveSession();
 
-    var isTimed = session.timer.mode === 'timed';
+    var isTimed = s.timer.mode === 'timed';
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs) });
-    var totalEl = el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: isTimed ? formatMs(session.timer.totalMs) : '' });
+    var totalEl = el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: isTimed ? formatMs(s.timer.totalMs) : '' });
 
-    var answeredCount = s.queue.filter(function (cur) {
-      return s.answers.some(function (a) { return a.qid === cur.qid && String(a.isRecheck) === String(cur.isRecheck) && a.chosen != null; });
-    }).length;
-    var pct = Math.round((answeredCount / s.queue.length) * 100);
+    var progressFill = el('div', { class: 'fill', style: 'width:0%' });
 
     var topContainer = el('div', { class: 'session-top', style: 'display:flex; align-items:center; gap:10px; margin-bottom:16px; width:100%;' }, [
       el('button', {
@@ -164,12 +163,18 @@
       }),
       el('div', { class: 'small muted', style: 'white-space:nowrap;', text: 'กระดาษคำตอบ' }),
       elapsedEl,
-      el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [el('div', { class: 'fill', style: 'width:' + pct + '%' })]),
+      el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [progressFill]),
       totalEl
     ]);
     root.appendChild(topContainer);
 
-    startTick(session, elapsedEl);
+    startTick(session, elapsedEl, function() {
+      var pct = 100;
+      if (isTimed && s.timer.totalMs > 0) {
+        pct = Math.min(100, Math.round((sessionElapsedMs / s.timer.totalMs) * 100));
+      }
+      progressFill.style.width = pct + '%';
+    });
 
     s.queue.forEach(function (current, idx) {
       var q = findQuestion(current.qid);
@@ -212,12 +217,6 @@
             }
             activeS.timer.elapsedMs = sessionElapsedMs;
             App.storage.setActiveSession(activeS);
-
-            var newAnswered = activeS.queue.filter(function (cur) {
-              return activeS.answers.some(function (a) { return a.qid === cur.qid && String(a.isRecheck) === String(cur.isRecheck) && a.chosen != null; });
-            }).length;
-            var barFill = topContainer.querySelector('.progress-bar .fill');
-            if (barFill) barFill.style.width = Math.round((newAnswered / activeS.queue.length) * 100) + '%';
           }
         });
         btn.appendChild(el('span', { class: 'choice-tag', text: LETTERS[displayIdx] }));
@@ -291,12 +290,10 @@
   }
 
   // ==========================================
-  // 🔥 โหมด Button
+  // 🔥 โหมด Button (หลอด Progress เป็นเวลา)
   // ==========================================
   function renderButtonMode(root, session) {
     var el = App.el;
-    
-    // 🔥 ดึงข้อมูลล่าสุดจาก Storage เสมอ
     var s = App.storage.getActiveSession();
     var current = s.queue[s.index];
     if (!current) { finishSession(s); return; }
@@ -317,6 +314,8 @@
     var elapsedEl = el('div', { class: 'small', style: 'font-variant-numeric: tabular-nums; font-weight:700; white-space:nowrap;', text: formatMs(sessionElapsedMs) });
     var totalEl = el('div', { class: 'small muted', style: 'font-variant-numeric: tabular-nums; white-space:nowrap;', text: isTimed ? formatMs(s.timer.totalMs) : '' });
 
+    var progressFill = el('div', { class: 'fill', style: 'width:0%' });
+
     var topContainer = el('div', { class: 'session-top', style: 'display:flex; align-items:center; gap:10px; margin-bottom:16px; width:100%;' }, [
       el('button', {
         class: 'icon-btn', 'aria-label': 'ออก', text: '✕',
@@ -330,12 +329,19 @@
       }),
       el('div', { class: 'small muted', style: 'white-space:nowrap;', text: (s.index + 1) + ' / ' + s.queue.length }),
       elapsedEl,
-      el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [el('div', { class: 'fill', style: 'width:' + Math.round((s.index / s.queue.length) * 100) + '%' })]),
+      el('div', { class: 'progress-bar', style: 'flex:1; margin:0 4px;' }, [progressFill]),
       totalEl
     ]);
     root.appendChild(topContainer);
 
-    startTick(s, elapsedEl);
+    // 🔥 หลอด Progress ของโหมด Button ใช้เวลาจริง
+    startTick(s, elapsedEl, function() {
+      var pct = 100;
+      if (isTimed && s.timer.totalMs > 0) {
+        pct = Math.min(100, Math.round((sessionElapsedMs / s.timer.totalMs) * 100));
+      }
+      progressFill.style.width = pct + '%';
+    });
 
     var card = el('div', { class: 'card' }, [
       el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic }),
@@ -465,9 +471,8 @@
       existing.correct = correct;
       existing.type = type;
       existing.timeMs = timeMs; 
-      existing.chosen = chosen; // 🔥 อัปเดต chosen ให้แน่ใจ
+      existing.chosen = chosen; 
     } else {
-      // ถ้าไม่มี ให้สร้างใหม่ (Safety)
       s.answers.push({
         qid: q.id, chosen: chosen, correct: correct, confidence: confidence, timeMs: timeMs, cause: null, isRecheck: current.isRecheck, type: type
       });
@@ -571,9 +576,55 @@
       wrap.appendChild(chipRow);
     }
 
+    // 🔥 AI Row: ปุ่มซ้ายคัดลอก+เด้ง, ปุ่มขวาคงเดิม
     var aiRow = el('div', { class: 'row', style: 'flex-wrap:wrap; margin-top:16px;' }, [
-      el('button', { class: 'btn', text: 'ถาม AI', onclick: function () { /* ... */ } }),
-      el('button', { class: 'btn btn-primary', text: 'แชท AI', onclick: function () { App.chat.open(q, order, answer); } })
+      el('button', { 
+        class: 'btn', 
+        text: 'ถาม AI (คัดลอก)', 
+        onclick: function () {
+          var text;
+          if (App.askai && App.askai.buildAskAIText) {
+            text = App.askai.buildAskAIText(q, order, answer.chosen, answer.confidence);
+          } else {
+            text = 'โจทย์: ' + q.question + '\n';
+            text += 'คำตอบที่ฉันเลือก: ' + q.choices[answer.chosen] + '\n';
+            text += 'คำตอบที่ถูก: ' + q.choices[q.answer] + '\n';
+            text += 'คำอธิบาย: ' + q.explanation + '\n';
+            text += '\nช่วยอธิบายเพิ่มเติมว่าทำไมข้อนี้ถึงตอบแบบนี้ และฉันควรระวังอะไรบ้าง';
+          }
+
+          if (App.askai && App.askai.copyText) {
+            App.askai.copyText(text).then(function () {
+              App.toast('คัดลอกข้อความแล้ว เปิดเว็บ AI เพื่อวาง');
+              window.open('https://claude.ai', '_blank', 'noopener');
+            }, function () {
+              App.toast('คัดลอกไม่สำเร็จ');
+            });
+          } else {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(function () {
+                App.toast('คัดลอกข้อความแล้ว เปิดเว็บ AI เพื่อวาง');
+                window.open('https://claude.ai', '_blank', 'noopener');
+              }, function () {
+                App.toast('คัดลอกไม่สำเร็จ');
+              });
+            } else {
+              App.toast('เบราว์เซอร์นี้ไม่รองรับการคัดลอกอัตโนมัติ');
+            }
+          }
+        }
+      }),
+      el('button', { 
+        class: 'btn btn-primary', 
+        text: 'แชท AI', 
+        onclick: function () { 
+          if (App.chat && App.chat.open) {
+            App.chat.open(q, order, answer); 
+          } else {
+            App.toast('ฟีเจอร์แชท AI ยังไม่พร้อม');
+          }
+        } 
+      })
     ]);
     wrap.appendChild(aiRow);
 

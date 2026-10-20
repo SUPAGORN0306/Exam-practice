@@ -28,6 +28,9 @@
     var el = App.el;
     var questions = App.loadQuestions();
 
+    // 🔥 ล้างจอเก่าให้เกลี้ยงก่อนวาด Setup
+    while (root.firstChild) root.removeChild(root.firstChild);
+
     if (questions.length === 0) {
       root.appendChild(el('div', { class: 'empty' }, [
         el('p', { text: 'ยังไม่มีข้อสอบในระบบ' }),
@@ -270,10 +273,10 @@
 
   function renderCard(root) {
     var el = App.el;
-    // 🔥 ล้างหน้าจอให้เกลี้ยง
+    // 🔥 ล้างหน้าจอให้เกลี้ยงก่อนวาดการ์ดใบใหม่
     while (root.firstChild) root.removeChild(root.firstChild);
 
-    // 🔥 ถ้าไม่มีข้อสอบเหลือ (ปัดครบแล้ว) ให้แสดงหน้าจอจบการทบทวน
+    // 🔥 ถ้าไม่มีข้อสอบเหลือ (ปัดครบแล้ว) ให้แสดงหน้าจอจบการทบทวน "แค่หน้าเดียว"
     if (cards.length === 0) {
       root.appendChild(el('div', { class: 'card center', style: 'padding: 40px 20px;' }, [
         el('h2', { text: 'ทบทวนครบทุกใบแล้ว' }),
@@ -292,7 +295,7 @@
       class: 'session-top',
       style: 'display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;'
     }, [
-      el('button', { class: 'icon-btn', text: '✕', onclick: function () { App.views.flashcards(root); } }), // กลับไปหน้า Setup
+      el('button', { class: 'icon-btn', text: '✕', onclick: function () { App.views.flashcards(root); } }), 
       el('div', { class: 'small muted', style: 'font-weight:600; font-variant-numeric: tabular-nums; font-size:1.1rem;', text: understoodCount + ' / ' + totalCardsCount }),
       el('div', { style: 'width:48px;' })
     ]));
@@ -446,7 +449,7 @@
       // 🔥 เอาการ์ดออกจากกอง
       cards.splice(currentIndex, 1);
       
-      // 🔥 ถ้าไม่มีข้อสอบเหลือแล้ว ให้ renderCard จัดการหน้าจอจบให้เอง (ไม่ต้องเด้งกลับ Setup)
+      // 🔥 ถ้าไม่มีข้อสอบเหลือแล้ว ให้ renderCard จัดการหน้าจอจบ (มันจะล้างจอให้เอง)
       if (cards.length === 0) {
         renderCard(root);
         return;
