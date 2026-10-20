@@ -67,7 +67,7 @@
   }
 
   function renderSession(root) {
-    clearTimer(); // ล้างตัวจับเวลาเก่าเสมอเมื่อวาดหน้าจอใหม่
+    clearTimer(); // ล้างตัวจับเวลาเก่าเสมอ
     
     var el = App.el;
     var session = App.storage.getActiveSession();
@@ -91,34 +91,61 @@
     var order = session.choiceOrders[q.id] || q.choices.map(function (_, i) { return i; });
     var existing = session.answers.find(function (a) { return a.qid === q.id && !a.isRecheck; });
 
-    // --- Top bar with timer (ปรับให้ชัดเจน) ---
+    // --- Top bar with timer (จัด Layout ใหม่) ---
     var isTimed = session.timer.mode === 'timed';
-    var timeLabel = isTimed && !overtimeStarted ? 'เหลือ: ' : 'เวลา: ';
+    var timeLabel = isTimed && !overtimeStarted ? 'เหลือ ' : ''; // ถ้าเป็น timed ให้ใช้คำว่า "เหลือ"
     
     var timerEl = el('div', {
       class: 'small',
-      style: 'font-variant-numeric: tabular-nums; min-width:75px; text-align:center; background:var(--bg); padding:4px 8px; border-radius:8px; font-weight:600; color:var(--primary);',
+      style: 'font-variant-numeric: tabular-nums; min-width:70px; text-align:right; font-weight:700; color:var(--text);',
       text: timeLabel + formatMs(sessionElapsedMs || session.timer.elapsedMs || 0)
     });
     
     var pct = Math.round((session.index / session.n) * 100);
-    root.appendChild(el('div', { class: 'session-top', style: 'flex-wrap: nowrap; gap: 8px;' }, [
-      el('button', { class: 'icon-btn', 'aria-label': 'ออก', text: '✕', onclick: function () {
+    
+    // สร้าง Container สำหรับ Session Top
+    var topContainer = el('div', { 
+      class: 'session-top', 
+      style: 'display:flex; align-items:center; gap:12px; margin-bottom:16px;' 
+    });
+    
+    // 1. ปุ่มออก
+    topContainer.appendChild(el('button', { 
+      class: 'icon-btn', 
+      'aria-label': 'ออก', 
+      text: '✕', 
+      onclick: function () {
         if (App.confirm('ความคืบหน้าจะถูกเก็บไว้ ต้องการออกหรือไม่?')) {
           clearTimer();
           var s = App.storage.getActiveSession();
           if (s) { s.timer.elapsedMs = sessionElapsedMs; App.storage.setActiveSession(s); }
           App.navigate('home');
         }
-      }}),
-      el('div', { class: 'small muted', style: 'white-space:nowrap;', text: (session.index + 1) + ' / ' + session.n }),
-      timerEl,
-      el('div', { class: 'progress-bar', style: 'flex:1;' }, [el('div', { class: 'fill', style: 'width:' + pct + '%' })])
+      }
+    }));
+    
+    // 2. เลขข้อ
+    topContainer.appendChild(el('div', { 
+      class: 'small muted', 
+      style: 'white-space:nowrap;', 
+      text: (session.index + 1) + ' / ' + session.n 
+    }));
+    
+    // 3. Progress Bar (อยู่ตรงกลาง)
+    topContainer.appendChild(el('div', { 
+      class: 'progress-bar', 
+      style: 'flex:1; margin:0 8px;' 
+    }, [
+      el('div', { class: 'fill', style: 'width:' + pct + '%' })
     ]));
+    
+    // 4. ตัวเลขเวลา (อยู่ขวาสุด)
+    topContainer.appendChild(timerEl);
+
+    root.appendChild(topContainer);
 
     // --- Timer tick ---
     var questionStart = Date.now();
-    var answerCommitAt = null;
     timerInterval = setInterval(function () {
       if (hiddenAt) return;
       sessionElapsedMs += 1000;
@@ -129,7 +156,7 @@
       var remainOrElapsed = session.timer.mode === 'timed' && !overtimeStarted
         ? (session.timer.totalMs - sessionElapsedMs)
         : sessionElapsedMs;
-      var label = session.timer.mode === 'timed' && !overtimeStarted ? 'เหลือ: ' : 'เวลา: ';
+      var label = session.timer.mode === 'timed' && !overtimeStarted ? 'เหลือ ' : '';
       timerEl.textContent = label + formatMs(Math.max(0, remainOrElapsed));
     }, 1000);
 
@@ -255,8 +282,6 @@
     if (!ans) {
       clearTimer();
       finishSession(s);
-    } else {
-      // Continue in overtime; timer switches to count-up automatically via session.timer.overtime
     }
   }
 
@@ -412,4 +437,5 @@
 
   App.views.session = function (root) { renderSession(root); };
   App.views.session.startNew = startNew;
+  App.views.session.clearTimer = clearTimer; // 🔥 Export ฟังก์ชันนี้ให้ app.js เรียกใช้ได้
 })();

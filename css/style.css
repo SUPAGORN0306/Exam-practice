@@ -1,5 +1,5 @@
 /* =========================================================
-   Smart Practice — base styles (Cleaned & Merged)
+   Smart Practice — base styles (Cleaned & Fixed Spacing)
    ========================================================= */
 
 :root {
@@ -25,7 +25,7 @@
   --line-height: 1.6;
 
   --tap-min: 48px;
-  --gap: 12px;
+  --gap: 16px; /* เพิ่มระยะห่าง */
   --pad: 16px;
 }
 
@@ -62,10 +62,11 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-h1, h2, h3 { margin: 0; line-height: 1.3; }
+/* --- Typography & Spacing Fix --- */
+h1, h2, h3 { margin: 0; line-height: 1.4; }
 h1 { font-size: 1.35rem; }
-h2 { font-size: 1.15rem; }
-h3 { font-size: 1rem; }
+h2 { font-size: 1.15rem; margin-bottom: 8px; } /* เพิ่มระยะห่างใต้ h2 */
+h3 { font-size: 1rem; margin-bottom: 6px; }
 
 button, input, select, textarea { font: inherit; color: inherit; }
 
@@ -147,12 +148,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: 16px;
+  border-radius: var(--radius-lg); padding: 20px; /* เพิ่ม padding ใน card */
   box-shadow: var(--shadow-sm);
 }
 
 .card + .card { margin-top: var(--gap); }
-.section-title { font-size: 0.95rem; color: var(--muted); margin: 8px 0; font-weight: 600; }
+.section-title { font-size: 0.95rem; color: var(--muted); margin: 12px 0 8px; font-weight: 600; }
 .stack > * + * { margin-top: var(--gap); }
 .muted { color: var(--muted); }
 .small { font-size: 0.85rem; }
@@ -161,15 +162,26 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .row-between { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-/* ------------------ Forms ------------------ */
+/* ------------------ Forms (ปรับระยะห่างฟอร์มให้ชัดเจน) ------------------ */
 
-.field { display: block; margin-bottom: 12px; }
-.field > .label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.95rem; }
-.field .hint { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
-.field .error { color: var(--wrong); font-size: 0.85rem; margin-top: 4px; }
+.field { display: block; margin-bottom: 20px; } /* เพิ่มระยะห่างระหว่างช่อง */
+.field > .label { 
+  display: block; 
+  font-weight: 600; 
+  margin-bottom: 8px; /* เพิ่มระยะห่างระหว่าง Label กับ Input */
+  font-size: 0.95rem; 
+  color: var(--text);
+}
+.field .hint { 
+  color: var(--muted); 
+  font-size: 0.8rem; 
+  margin-top: 6px; /* เพิ่มระยะห่างใต้ Input */
+  line-height: 1.5;
+}
+.field .error { color: var(--wrong); font-size: 0.85rem; margin-top: 6px; }
 
 .input, .select, .textarea {
-  width: 100%; min-height: var(--tap-min); padding: 10px 12px;
+  width: 100%; min-height: var(--tap-min); padding: 12px 14px;
   border: 1px solid var(--border); border-radius: var(--radius-md);
   background: var(--surface); color: var(--text);
 }
@@ -180,7 +192,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* ------------------ Tabs ------------------ */
 
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 12px; overflow-x: auto; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
 .tab {
   min-height: var(--tap-min); padding: 8px 14px;
   border: none; background: transparent; color: var(--muted);
@@ -192,10 +204,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .session-top {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 8px; margin-bottom: 12px;
+  gap: 12px; margin-bottom: 16px;
 }
 
-/* Progress bar (Updated from Round 3 fix) */
+/* Progress bar */
 .progress-bar {
   flex: 1;
   width: 100%;
@@ -215,16 +227,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .choice-btn {
   display: block; width: 100%; min-height: 52px;
-  text-align: left; padding: 12px 14px;
+  text-align: left; padding: 14px 16px;
   border: 1px solid var(--border); border-radius: var(--radius-md);
   background: var(--surface); color: var(--text);
-  cursor: pointer; margin-bottom: 8px;
+  cursor: pointer; margin-bottom: 12px;
   white-space: pre-wrap; word-break: break-word;
-  line-height: 1.4; position: relative;
+  line-height: 1.5; position: relative;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.choice-btn .choice-tag { display: inline-block; min-width: 28px; font-weight: 700; margin-right: 6px; color: var(--muted); }
+.choice-btn .choice-tag { display: inline-block; min-width: 28px; font-weight: 700; margin-right: 8px; color: var(--muted); }
 .choice-btn.selected { border-color: var(--primary); background: rgba(47, 91, 234, 0.06); }
 .choice-btn.correct { border-color: var(--correct); background: rgba(30, 127, 79, 0.08); }
 .choice-btn.wrong { border-color: var(--wrong); background: rgba(192, 57, 43, 0.08); }
@@ -233,35 +245,35 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .confidence-bar {
   position: sticky; bottom: calc(80px + env(safe-area-inset-bottom));
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: 12px;
-  margin-top: 12px; box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg); padding: 16px;
+  margin-top: 16px; box-shadow: var(--shadow-md);
 }
-.confidence-bar .title { font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; }
+.confidence-bar .title { font-size: 0.85rem; color: var(--muted); margin-bottom: 12px; }
 .confidence-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .confidence-options .btn { padding: 10px 8px; }
 
 .banner {
-  display: flex; gap: 10px; align-items: flex-start;
-  padding: 12px 14px; border-radius: var(--radius-md);
-  margin-bottom: 12px; border: 1px solid var(--border);
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 16px; border-radius: var(--radius-md);
+  margin-bottom: 16px; border: 1px solid var(--border);
 }
 .banner.correct { background: rgba(30, 127, 79, 0.08); border-color: var(--correct); }
 .banner.wrong { background: rgba(192, 57, 43, 0.08); border-color: var(--wrong); }
 .banner.warn { background: rgba(154, 103, 0, 0.08); border-color: var(--warn); }
-.banner .icon { font-size: 1.3rem; line-height: 1; }
+.banner .icon { font-size: 1.5rem; line-height: 1; }
 
 .explain-box {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius-md); padding: 12px 14px;
-  margin-top: 12px; white-space: pre-wrap; word-break: break-word;
+  border-radius: var(--radius-md); padding: 16px;
+  margin-top: 16px; white-space: pre-wrap; word-break: break-word;
 }
 
 .details {
   border: 1px solid var(--border); border-radius: var(--radius-md);
-  padding: 10px 14px; background: var(--surface); margin-top: 8px;
+  padding: 12px 16px; background: var(--surface); margin-top: 12px;
 }
 .details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
-.details[open] summary { margin-bottom: 8px; }
+.details[open] summary { margin-bottom: 12px; }
 .details .body { white-space: pre-wrap; word-break: break-word; }
 
 .chip {
@@ -282,30 +294,30 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .list-item {
   display: block; width: 100%; text-align: left;
-  padding: 12px 14px; border: 1px solid var(--border);
+  padding: 14px 16px; border: 1px solid var(--border);
   border-radius: var(--radius-md); background: var(--surface);
-  margin-bottom: 8px; cursor: pointer;
+  margin-bottom: 10px; cursor: pointer;
 }
-.list-item .title { font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.list-item .meta { color: var(--muted); font-size: 0.8rem; }
+.list-item .title { font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-item .meta { color: var(--muted); font-size: 0.85rem; }
 .badge {
   display: inline-block; font-size: 0.7rem; padding: 2px 8px;
   border-radius: 999px; background: rgba(47, 91, 234, 0.12); color: var(--primary);
   margin-left: 6px; font-weight: 600;
 }
 
-.choice-row { display: flex; gap: 6px; align-items: flex-start; margin-bottom: 8px; }
+.choice-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 12px; }
 .choice-row .choice-letter { min-width: 28px; height: 48px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--muted); }
 .choice-row .choice-inputs { flex: 1; }
-.choice-row .radio-answer { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; margin-top: 4px; }
+.choice-row .radio-answer { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; margin-top: 6px; }
 .choice-row .remove-choice { align-self: center; }
 
 /* ------------------ Summary ------------------ */
 
 .stat-big { font-size: 2rem; font-weight: 700; }
-.stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.stat-cell { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; background: var(--surface); }
-.stat-cell .label { font-size: 0.8rem; color: var(--muted); }
+.stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.stat-cell { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; background: var(--surface); }
+.stat-cell .label { font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
 .stat-cell .value { font-weight: 700; font-size: 1.1rem; }
 .stat-cell.highlight { border-color: var(--warn); background: rgba(154, 103, 0, 0.08); }
 

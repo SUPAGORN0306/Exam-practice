@@ -20,11 +20,21 @@
   }
 
   function render() {
+    // 🔥 ล้างตัวจับเวลาเก่าเสมอเมื่อเปลี่ยนหน้า (แก้บั๊กซ้อน)
+    if (window.App.views.session && window.App.views.session.clearTimer) {
+      window.App.views.session.clearTimer();
+    }
+
     var r = parseHash();
     setActiveNav(r.name);
     var main = document.getElementById('main');
     if (!main) return;
-    while (main.firstChild) main.removeChild(main.firstChild);
+    
+    // 🔥 ล้าง HTML เก่าให้เกลี้ยงก่อนวาดใหม่
+    while (main.firstChild) {
+      main.removeChild(main.firstChild);
+    }
+
     var fn = App.views && App.views[r.name];
     if (typeof fn === 'function') {
       try { fn(main, r.query); }
