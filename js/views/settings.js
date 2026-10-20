@@ -25,7 +25,6 @@
     });
     themeSelect.addEventListener('change', function () { update({ theme: themeSelect.value }); });
 
-    // 🔥 ภาษา (ยังไม่ได้แปลข้อความทั้งแอป แค่ UI ไว้ก่อน)
     var langSelect = el('select', { class: 'select' });
     [{ v: 'th', t: 'ไทย' }, { v: 'en', t: 'English (เร็วๆ นี้)' }].forEach(function (o) {
       var opt = el('option', { value: o.v, text: o.t });
@@ -54,12 +53,15 @@
     // 2. การฝึกฝน (Shuffle, Timer, Goal, Size, Answer Mode)
     // ==========================================
 
-    // Toggle Switch "สลับลำดับตัวเลือก"
+    // 🔥 Toggle Switch (แก้บั๊ก: ดึงค่าล่าสุดจาก storage ทุกครั้ง)
     var shuffleToggle = el('div', {
       style: 'display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; cursor:pointer;',
       onclick: function () {
-        var newVal = !s.shuffleChoices;
+        var current = App.storage.getSettings();
+        var newVal = !current.shuffleChoices;
         update({ shuffleChoices: newVal });
+        
+        // อัปเดต UI ทันที
         if (newVal) {
           shuffleKnob.style.transform = 'translateX(20px)';
           shuffleTrack.style.background = 'var(--primary)';
@@ -130,7 +132,7 @@
     });
     sizeSelect.addEventListener('change', function () { update({ defaultSessionSize: parseInt(sizeSelect.value, 10) }); });
 
-    // 🔥 รูปแบบการตอบ (answerMode - ใช้ใน localStorage)
+    // รูปแบบการตอบ
     var answerMode = localStorage.getItem('answerMode') || 'button';
     var answerModeSelect = el('select', { class: 'select' });
     [{ v: 'button', t: 'กดปุ่ม (ทีละข้อ)' }, { v: 'scroll', t: 'เลื่อนลง (กระดาษคำตอบ)' }].forEach(function (o) {
@@ -222,7 +224,6 @@
     // 4. ข้อมูล (Data Management) - แยกการ์ด
     // ==========================================
 
-    // 🔥 การ์ดสำรองข้อมูล
     root.appendChild(el('div', { class: 'card' }, [
       el('h3', { text: 'สำรองข้อมูล' }),
       el('p', { class: 'small muted', style: 'margin:8px 0 12px;', text: 'ดาวน์โหลดข้อมูลทั้งหมดเป็นไฟล์ JSON หรือกู้คืนจากไฟล์สำรอง' }),
@@ -233,7 +234,6 @@
       })
     ]));
 
-    // 🔥 การ์ดรีเซ็ตความคืบหน้า
     root.appendChild(el('div', { class: 'card' }, [
       el('h3', { text: 'รีเซ็ตความคืบหน้า' }),
       el('p', { class: 'small muted', style: 'margin:8px 0 12px;', text: 'ล้างสถิติการเรียน, กล่อง Leitner, และวันที่ทบทวนทั้งหมด (ข้อสอบยังอยู่)' }),
@@ -254,7 +254,6 @@
       })
     ]));
 
-    // 🔥 การ์ดลบข้อมูลทั้งหมด
     root.appendChild(el('div', { class: 'card' }, [
       el('h3', { text: 'ลบข้อมูลทั้งหมด' }),
       el('p', { class: 'small muted', style: 'margin:8px 0 12px;', text: 'ลบทุกอย่างในแอป (ข้อสอบ, สถิติ, การตั้งค่า) ไม่สามารถกู้คืนได้' }),

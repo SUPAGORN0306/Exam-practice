@@ -173,7 +173,7 @@
       el('p', { class: 'muted small', style: 'margin:4px 0 12px;', text: 'ปัดซ้าย-ขวาเพื่อทบทวนการ์ด พร้อมระบบ Leitner' }),
       el('button', {
         class: 'btn btn-block',
-        text: '▣ ฝึกแฟลชการ์ด',
+        text: 'ฝึกแฟลชการ์ด',
         onclick: function () { window.location.hash = '#/flashcards'; }
       })
     ]));
