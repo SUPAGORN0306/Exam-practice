@@ -7,11 +7,10 @@
   var currentIndex = 0;
   var flipped = false;
 
-  // เก็บ state การเลือก เพื่อให้กลับมาจากจบชุดแล้วค่าเดิมยังอยู่
   var selection = {
     subjectId: null,
-    chapters: [],   // array ของชื่อ topic ที่เลือก (ว่าง = ทุกบท)
-    limit: 20       // 0 = ทั้งหมด
+    chapters: [],
+    limit: 20
   };
 
   function shuffle(arr) {
@@ -35,25 +34,18 @@
       return;
     }
 
-    // --- Selection UI ---
     var selectedSubject = selection.subjectId;
     var selectedChapters = selection.chapters.slice();
     var selectedLimit = selection.limit;
 
-    // container สำหรับ checkbox บท (จะ re-render เมื่อเปลี่ยนวิชา)
     var chapterContainer = el('div', { id: 'fc-chapter-container' });
-
-    // container สำหรับปุ่มลัดจำนวนข้อ
     var limitContainer = el('div', { id: 'fc-limit-container', class: 'row', style: 'gap:8px; flex-wrap:wrap;' });
-
-    // ข้อความบอกจำนวนข้อที่มีจริง
     var poolInfo = el('p', { class: 'muted small', style: 'margin-top:8px;' });
 
     root.appendChild(el('div', { class: 'card' }, [
       el('h2', { text: 'ฝึกแฟลชการ์ด' }),
       el('p', { class: 'muted small', text: 'เลือกวิชา บท (ได้หลายบท) และจำนวนข้อ' }),
 
-      // วิชา
       el('div', { class: 'field', style: 'margin-top:16px;' }, [
         el('span', { class: 'label', text: 'วิชา' }),
         (function () {
@@ -68,7 +60,6 @@
           if (selectedSubject) sel.value = selectedSubject;
           sel.addEventListener('change', function () {
             selectedSubject = sel.value || null;
-            // เปลี่ยนวิชา → reset บทที่เลือกไว้ (เพราะชื่อบทอาจไม่ตรงกัน)
             selectedChapters = [];
             selection.subjectId = selectedSubject;
             selection.chapters = [];
@@ -79,7 +70,6 @@
         })()
       ]),
 
-      // บท (multi-checkbox)
       el('div', { class: 'field' }, [
         el('div', { style: 'display:flex; align-items:center; justify-content:space-between; gap:8px;' }, [
           el('span', { class: 'label', text: 'บท (เลือกได้หลายบท)' }),
@@ -112,7 +102,6 @@
         chapterContainer
       ]),
 
-      // จำนวนข้อ
       el('div', { class: 'field' }, [
         el('span', { class: 'label', text: 'จำนวนข้อ' }),
         limitContainer,
@@ -132,8 +121,6 @@
       })
     ]));
 
-    // ---------- helpers ----------
-
     function getPool() {
       return questions.filter(function (q) {
         if (selectedSubject && q.subject !== selectedSubject) return false;
@@ -149,7 +136,6 @@
         return !selectedSubject || q.subject === selectedSubject;
       });
 
-      // นับจำนวนข้อต่อบท
       var topics = {};
       filtered.forEach(function (q) {
         topics[q.topic] = (topics[q.topic] || 0) + 1;
@@ -161,8 +147,8 @@
         return;
       }
 
-      topicNames.forEach(function (t) {
-        var id = 'fc-ch-' + Math.random().toString(36).slice(2, 8);
+      topicNames.forEach(function (t, idx) {
+        var id = 'fc-ch-' + idx + '-' + t.replace(/\s+/g, '_');
         var cb = el('input', { type: 'checkbox', id: id, value: t });
         if (selectedChapters.indexOf(t) !== -1) cb.checked = true;
 
@@ -170,8 +156,8 @@
           if (cb.checked) {
             if (selectedChapters.indexOf(t) === -1) selectedChapters.push(t);
           } else {
-            var idx = selectedChapters.indexOf(t);
-            if (idx !== -1) selectedChapters.splice(idx, 1);
+            var i = selectedChapters.indexOf(t);
+            if (i !== -1) selectedChapters.splice(i, 1);
           }
           selection.chapters = selectedChapters.slice();
           updatePoolInfo();
@@ -215,8 +201,7 @@
     }
 
     function updatePoolInfo() {
-      var pool = getPool();
-      var n = pool.length;
+      var n = getPool().length;
       var msg;
       if (n === 0) {
         msg = 'ไม่มีข้อสอบในเงื่อนไขที่เลือก';
@@ -230,7 +215,6 @@
       poolInfo.textContent = msg;
     }
 
-    // init
     renderChapters();
     renderLimitButtons();
     updatePoolInfo();
@@ -255,7 +239,6 @@
       return;
     }
 
-    // แยก due / rest
     var due = [];
     var rest = [];
     pool.forEach(function (q) {
@@ -270,10 +253,6 @@
 
     if (limit > 0 && limit < merged.length) {
       merged = merged.slice(0, limit);
-      if (limit > pool.length) {
-        // ไม่ควรเกิด แต่กันไว้
-        App.toast('มีข้อสอบแค่ ' + pool.length + ' ข้อ');
-      }
     }
     cards = merged;
 
@@ -287,7 +266,6 @@
     var el = App.el;
     while (root.firstChild) root.removeChild(root.firstChild);
 
-    // Top bar
     root.appendChild(el('div', {
       class: 'session-top',
       style: 'display:flex; align-items:center; gap:12px; margin-bottom:16px;'
@@ -313,18 +291,15 @@
 
     var q = cards[currentIndex];
 
-    // Card container
     var scene = el('div', { class: 'flashcard-scene' });
     var inner = el('div', { class: 'flashcard-inner' + (flipped ? ' is-flipped' : '') });
 
-    // Front
     var front = el('div', { class: 'flashcard-front' }, [
       el('div', { class: 'small muted', text: App.subjectName(q.subject) + ' • ' + q.topic }),
       el('h2', { style: 'margin-top:16px; white-space:pre-wrap;', text: q.question }),
       el('p', { class: 'muted', style: 'margin-top:32px; font-size:0.9rem;', text: 'แตะเพื่อพลิกดูเฉลย' })
     ]);
 
-    // Back
     var back = el('div', { class: 'flashcard-back' }, [
       el('div', { class: 'small muted', text: 'เฉลย' }),
       el('h2', { style: 'margin-top:12px; color: var(--correct);', text: q.choices[q.answer] }),
@@ -339,13 +314,11 @@
     scene.appendChild(inner);
     root.appendChild(scene);
 
-    // Hint labels (Swipe)
     var hintLeft = el('div', { class: 'swipe-hint hint-left', text: 'จำไม่ได้' });
     var hintRight = el('div', { class: 'swipe-hint hint-right', text: 'จำได้' });
     scene.appendChild(hintLeft);
     scene.appendChild(hintRight);
 
-    // Flip Logic
     var isDragging = false;
 
     inner.addEventListener('click', function () {
@@ -354,17 +327,6 @@
       inner.classList.toggle('is-flipped', flipped);
     });
 
-    // Bottom Actions (Fallback for desktop)
-    root.appendChild(el('div', { class: 'row', style: 'margin-top:24px;' }, [
-      el('button', { class: 'btn btn-danger', style: 'flex:1;', text: 'จำไม่ได้', onclick: function () {
-        animateSwipe('left', q, root);
-      }}),
-      el('button', { class: 'btn btn-primary', style: 'flex:1;', text: 'จำได้', onclick: function () {
-        animateSwipe('right', q, root);
-      }})
-    ]));
-
-    // Swipe Logic (Pointer Events)
     var startX = 0, startY = 0, currentX = 0, currentY = 0;
     var swipeThreshold = 80;
 
@@ -373,6 +335,8 @@
       isDragging = true;
       startX = e.clientX;
       startY = e.clientY;
+      currentX = 0;
+      currentY = 0;
       inner.style.transition = 'none';
       scene.setPointerCapture(e.pointerId);
     });
@@ -402,38 +366,51 @@
     scene.addEventListener('pointerup', function (e) {
       if (!isDragging) return;
       isDragging = false;
-      inner.style.transition = '';
 
-      if (currentX < -swipeThreshold) {
-        animateSwipe('left', q, root);
-      } else if (currentX > swipeThreshold) {
-        animateSwipe('right', q, root);
+      var shouldSwipe = currentX < -swipeThreshold ? 'left'
+                      : currentX > swipeThreshold  ? 'right'
+                      : null;
+
+      if (shouldSwipe) {
+        animateSwipe(shouldSwipe, q, root);
       } else {
+        inner.style.transition = '';
         inner.style.transform = '';
         hintLeft.style.opacity = 0;
         hintRight.style.opacity = 0;
       }
       currentX = 0; currentY = 0;
     });
+
+    scene.addEventListener('pointercancel', function () {
+      if (!isDragging) return;
+      isDragging = false;
+      inner.style.transition = '';
+      inner.style.transform = '';
+      hintLeft.style.opacity = 0;
+      hintRight.style.opacity = 0;
+      currentX = 0; currentY = 0;
+    });
   }
 
   function animateSwipe(direction, q, root) {
     var inner = document.querySelector('.flashcard-inner');
+    if (!inner) return;
 
-    if (inner) {
-      inner.classList.add(direction === 'left' ? 'swipe-left' : 'swipe-right');
-    }
+    // ล้าง inline transform ค้างจากการลาก ก่อนใส่ class อนิเมชัน
+    inner.style.transition = '';
+    inner.style.transform = '';
+    // บังคับ reflow ให้ browser รับรู้ start state
+    void inner.offsetWidth;
+
+    inner.classList.add(direction === 'left' ? 'swipe-left' : 'swipe-right');
 
     setTimeout(function () {
-      if (direction === 'left') {
-        updateBox(q, false);
-      } else {
-        updateBox(q, true);
-      }
+      updateBox(q, direction === 'right');
       currentIndex++;
       flipped = false;
       renderCard(root);
-    }, 300);
+    }, 380);
   }
 
   function updateBox(q, remembered) {

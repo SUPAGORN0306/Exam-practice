@@ -400,16 +400,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   text-align: left;
 }
 
-/* อนิเมชันตอนปัดการ์ด */
-.swipe-card {
-  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
-}
-.swipe-card.swipe-left {
-  transform: translateX(-150%) rotate(-15deg) !important;
+/* อนิเมชันตอนปัดการ์ด — ใช้กับ .flashcard-inner โดยตรง */
+.flashcard-inner.swipe-left {
+  transition: transform 0.35s ease-out, opacity 0.35s ease-out !important;
+  transform: translateX(-150%) rotate(-18deg) !important;
   opacity: 0;
 }
-.swipe-card.swipe-right {
-  transform: translateX(150%) rotate(15deg) !important;
+.flashcard-inner.swipe-right {
+  transition: transform 0.35s ease-out, opacity 0.35s ease-out !important;
+  transform: translateX(150%) rotate(18deg) !important;
   opacity: 0;
 }
 
@@ -439,8 +438,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border-color: var(--correct);
   transform: rotate(15deg);
 }
-/* ------------------ Reduced motion ------------------ */
-/* ------------------ Small buttons & checkbox rows ------------------ */
 
 .btn-small {
   min-height: 36px;

@@ -1,11 +1,10 @@
-/* Session view — timers (untimed/timed), visibility pause, per-question timing, chat AI */
+/* Session view — Free Navigation (skip/back), continuous timer, per-question timing */
 (function () {
   window.App = window.App || {};
   App.views = App.views || {};
 
   var LETTERS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ'];
   var timerInterval = null;
-  var questionStartAt = null;
   var sessionElapsedMs = 0;
   var overtimeStarted = false;
   var hiddenAt = null;
@@ -67,7 +66,7 @@
   }
 
   function renderSession(root) {
-    clearTimer(); // ล้างตัวจับเวลาเก่าเสมอ
+    clearTimer();
     
     var el = App.el;
     var session = App.storage.getActiveSession();
@@ -89,11 +88,11 @@
     }
 
     var order = session.choiceOrders[q.id] || q.choices.map(function (_, i) { return i; });
-    var existing = session.answers.find(function (a) { return a.qid === q.id && !a.isRecheck; });
+    var existing = session.answers.find(function (a) { return a.qid === q.id && a.isRecheck === current.isRecheck; });
 
-    // --- Top bar with timer (จัด Layout ใหม่) ---
+    // --- Top bar with timer ---
     var isTimed = session.timer.mode === 'timed';
-    var timeLabel = isTimed && !overtimeStarted ? 'เหลือ ' : ''; // ถ้าเป็น timed ให้ใช้คำว่า "เหลือ"
+    var timeLabel = isTimed && !overtimeStarted ? 'เหลือ ' : '';
     
     var timerEl = el('div', {
       class: 'small',
@@ -103,17 +102,11 @@
     
     var pct = Math.round((session.index / session.n) * 100);
     
-    // สร้าง Container สำหรับ Session Top
-    var topContainer = el('div', { 
-      class: 'session-top', 
-      style: 'display:flex; align-items:center; gap:12px; margin-bottom:16px;' 
-    });
+    var topContainer = el('div', { class: 'session-top', style: 'display:flex; align-items:center; gap:12px; margin-bottom:16px;' });
     
-    // 1. ปุ่มออก
+    // ปุ่มออก
     topContainer.appendChild(el('button', { 
-      class: 'icon-btn', 
-      'aria-label': 'ออก', 
-      text: '✕', 
+      class: 'icon-btn', 'aria-label': 'ออก', text: '✕', 
       onclick: function () {
         if (App.confirm('ความคืบหน้าจะถูกเก็บไว้ ต้องการออกหรือไม่?')) {
           clearTimer();
@@ -123,29 +116,33 @@
         }
       }
     }));
-    
-    // 2. เลขข้อ
-    topContainer.appendChild(el('div', { 
-      class: 'small muted', 
-      style: 'white-space:nowrap;', 
-      text: (session.index + 1) + ' / ' + session.n 
+
+    // ปุ่มย้อนกลับ (แสดงเมื่ออยู่ข้อ 2 ขึ้นไป)
+    topContainer.appendChild(el('button', {
+      class: 'icon-btn', 'aria-label': 'ย้อนกลับ', text: '<',
+      disabled: session.index === 0,
+      style: session.index === 0 ? 'opacity:0; pointer-events:none;' : '',
+      onclick: function () {
+        if (session.index > 0) {
+          session.index--;
+          App.storage.setActiveSession(session);
+          App.render();
+        }
+      }
     }));
     
-    // 3. Progress Bar (อยู่ตรงกลาง)
-    topContainer.appendChild(el('div', { 
-      class: 'progress-bar', 
-      style: 'flex:1; margin:0 8px;' 
-    }, [
-      el('div', { class: 'fill', style: 'width:' + pct + '%' })
-    ]));
+    // เลขข้อ
+    topContainer.appendChild(el('div', { class: 'small muted', style: 'white-space:nowrap;', text: (session.index + 1) + ' / ' + session.n }));
     
-    // 4. ตัวเลขเวลา (อยู่ขวาสุด)
+    // Progress Bar
+    topContainer.appendChild(el('div', { class: 'progress-bar', style: 'flex:1; margin:0 8px;' }, [el('div', { class: 'fill', style: 'width:' + pct + '%' })]));
+    
+    // ตัวเลขเวลา
     topContainer.appendChild(timerEl);
 
     root.appendChild(topContainer);
 
     // --- Timer tick ---
-    var questionStart = Date.now();
     timerInterval = setInterval(function () {
       if (hiddenAt) return;
       sessionElapsedMs += 1000;
@@ -154,16 +151,14 @@
         showOvertimeModal(session);
       }
       var remainOrElapsed = session.timer.mode === 'timed' && !overtimeStarted
-        ? (session.timer.totalMs - sessionElapsedMs)
-        : sessionElapsedMs;
+        ? (session.timer.totalMs - sessionElapsedMs) : sessionElapsedMs;
       var label = session.timer.mode === 'timed' && !overtimeStarted ? 'เหลือ ' : '';
       timerEl.textContent = label + formatMs(Math.max(0, remainOrElapsed));
     }, 1000);
 
     document.addEventListener('visibilitychange', handleVisibility);
     function handleVisibility() {
-      if (document.hidden) { hiddenAt = Date.now(); }
-      else if (hiddenAt) { hiddenAt = null; }
+      if (document.hidden) { hiddenAt = Date.now(); } else if (hiddenAt) { hiddenAt = null; }
     }
 
     // --- Question card ---
@@ -202,68 +197,33 @@
     });
 
     var bottomWrap = el('div', { style: 'margin-top:12px;' });
+    
     function renderConfidence() {
       while (bottomWrap.firstChild) bottomWrap.removeChild(bottomWrap.firstChild);
-      if (revealed || chosen == null) return;
-      var bar = el('div', { class: 'confidence-bar' }, [
-        el('div', { class: 'title', text: 'เลือกความมั่นใจเพื่อดูเฉลย' }),
-        el('div', { class: 'confidence-options' }, [
-          el('button', { class: 'btn', text: 'มั่นใจ', onclick: function () { commitAnswer('sure'); } }),
-          el('button', { class: 'btn', text: 'ไม่แน่ใจ', onclick: function () { commitAnswer('unsure'); } }),
-          el('button', { class: 'btn', text: 'เดา', onclick: function () { commitAnswer('guess'); } })
-        ])
-      ]);
-      bottomWrap.appendChild(bar);
-    }
+      if (revealed) return;
 
-    function commitAnswer(confidence) {
-      var s = App.storage.getActiveSession();
-      if (!s) return;
-      var cq = s.queue[s.index];
-      var question = findQuestion(cq.qid);
-      if (!question) return;
-      var correct = chosen === question.answer;
-      var type = App.scheduler.classifyAnswer(correct, confidence);
-      var timeMs = Date.now() - questionStart;
-
-      var answer = {
-        qid: question.id, chosen: chosen, correct: correct, confidence: confidence,
-        timeMs: timeMs, cause: null, isRecheck: cq.isRecheck === true, type: type
-      };
-
-      if (!answer.isRecheck) {
-        var progress = App.storage.getProgress();
-        var prev = progress[question.id] || {};
-        var nbox = App.scheduler.nextBox(prev, type, Date.now());
-        nbox.lastConfidence = confidence;
-        nbox.lastTimeMs = timeMs;
-        nbox.avgTimeMs = prev.avgTimeMs ? Math.round((prev.avgTimeMs + timeMs) / 2) : timeMs;
-        progress[question.id] = nbox;
-        App.storage.setProgress(progress);
-
-        App.recordDaily(question, confidence, correct, timeMs);
-        App.recordTopicScore(question, type);
-
-        if (!correct) {
-          var rechecks = s.recheckCount[question.id] || 0;
-          if (rechecks < 2) {
-            s.recheckCount[question.id] = rechecks + 1;
-            s.queue = App.scheduler.injectRecheck(s.queue, question.id, s.index);
-          }
-        }
+      if (chosen == null) {
+        // ถ้ายังไม่เลือกคำตอบ ให้มีปุ่ม "ข้ามข้อนี้" (ไปข้อถัดไปได้เลย)
+        bottomWrap.appendChild(el('button', {
+          class: 'btn btn-block', text: 'ข้ามข้อนี้ (ไว้กลับมาทำทีหลัง)',
+          onclick: function () { goNext(session); }
+        }));
       } else {
-        App.recordDaily(question, confidence, correct, timeMs);
+        // ถ้าเลือกแล้ว ให้แสดงปุ่มความมั่นใจ
+        var bar = el('div', { class: 'confidence-bar' }, [
+          el('div', { class: 'title', text: 'เลือกความมั่นใจเพื่อดูเฉลย' }),
+          el('div', { class: 'confidence-options' }, [
+            el('button', { class: 'btn', text: 'มั่นใจ', onclick: function () { commitAnswer('sure', q, chosen, session); } }),
+            el('button', { class: 'btn', text: 'ไม่แน่ใจ', onclick: function () { commitAnswer('unsure', q, chosen, session); } }),
+            el('button', { class: 'btn', text: 'เดา', onclick: function () { commitAnswer('guess', q, chosen, session); } })
+          ])
+        ]);
+        bottomWrap.appendChild(bar);
       }
-
-      s.answers.push(answer);
-      s.timer.elapsedMs = sessionElapsedMs;
-      App.storage.setActiveSession(s);
-      clearTimer();
-      renderSession(root);
     }
 
     if (revealed) {
-      bottomWrap.appendChild(buildReveal(q, order, existing));
+      bottomWrap.appendChild(buildReveal(q, order, existing, session));
     } else {
       renderConfidence();
     }
@@ -271,6 +231,72 @@
     card.appendChild(choicesWrap);
     root.appendChild(card);
     root.appendChild(bottomWrap);
+  }
+
+  // ฟังก์ชันสำหรับบันทึกคำตอบ
+  function commitAnswer(confidence, q, chosen, session) {
+    var current = session.queue[session.index];
+    var correct = chosen === q.answer;
+    var type = App.scheduler.classifyAnswer(correct, confidence);
+    
+    // คำนวณเวลาที่ใช้ในข้อนี้ (โดยประมาณจากเวลารวม)
+    var timeMs = 0; 
+    if (session.timer.mode !== 'timed') {
+      timeMs = 1000; // ให้เป็นค่าหยาบๆ ไปก่อน
+    }
+
+    var answer = {
+      qid: q.id, chosen: chosen, correct: correct, confidence: confidence,
+      timeMs: timeMs, cause: null, isRecheck: current.isRecheck === true, type: type
+    };
+
+    if (!answer.isRecheck) {
+      var progress = App.storage.getProgress();
+      var prev = progress[q.id] || {};
+      var nbox = App.scheduler.nextBox(prev, type, Date.now());
+      nbox.lastConfidence = confidence;
+      nbox.lastTimeMs = timeMs;
+      nbox.avgTimeMs = prev.avgTimeMs ? Math.round((prev.avgTimeMs + timeMs) / 2) : timeMs;
+      progress[q.id] = nbox;
+      App.storage.setProgress(progress);
+
+      App.recordDaily(q, confidence, correct, timeMs);
+      App.recordTopicScore(q, type);
+
+      if (!correct) {
+        var rechecks = session.recheckCount[q.id] || 0;
+        if (rechecks < 2) {
+          session.recheckCount[q.id] = rechecks + 1;
+          session.queue = App.scheduler.injectRecheck(session.queue, q.id, session.index);
+        }
+      }
+    } else {
+      App.recordDaily(q, confidence, correct, timeMs);
+    }
+
+    // ลบคำตอบเก่าของข้อนี้ทิ้งก่อน (กรณีกลับมาทำซ้ำ)
+    session.answers = session.answers.filter(function(a) { return a.qid !== q.id || a.isRecheck !== current.isRecheck; });
+    session.answers.push(answer);
+    
+    // อัปเดตเวลาเก็บไว้ใน session
+    session.timer.elapsedMs = sessionElapsedMs;
+    App.storage.setActiveSession(session);
+    
+    // 🔥 ไม่ clearTimer() แล้ว! ให้เวลาเดินต่อ
+    App.render(); 
+  }
+
+  // ฟังก์ชันสำหรับข้ามข้อ (ไปข้อถัดไป)
+  function goNext(session) {
+    session.index = session.index + 1;
+    App.storage.setActiveSession(session);
+    if (session.index >= session.queue.length) {
+      clearTimer();
+      finishSession(session);
+    } else {
+      // 🔥 ไม่ clearTimer() ให้เวลาเดินต่อ
+      App.render();
+    }
   }
 
   function showOvertimeModal(session) {
@@ -285,7 +311,7 @@
     }
   }
 
-  function buildReveal(q, order, answer) {
+  function buildReveal(q, order, answer, session) {
     var el = App.el;
     var wrap = el('div', { class: 'stack' });
     var isCorrect = answer.correct;
@@ -310,9 +336,7 @@
     );
 
     if (q.whyWrong && q.whyWrong.length === q.choices.length) {
-      var details = el('details', { class: 'details' }, [
-        el('summary', { text: 'ทำไมตัวเลือกอื่นถึงผิด' })
-      ]);
+      var details = el('details', { class: 'details' }, [el('summary', { text: 'ทำไมตัวเลือกอื่นถึงผิด' })]);
       var body = el('div', { class: 'body' });
       order.forEach(function (origIdx, displayIdx) {
         if (origIdx === q.answer) return;
@@ -343,8 +367,7 @@
             if (!s) return;
             var a = s.answers.find(function (x) { return x.qid === q.id && !x.isRecheck; });
             if (!a) return;
-            if (a.cause === c) { a.cause = null; }
-            else { App.recordCause(q.subject, c); a.cause = c; }
+            if (a.cause === c) { a.cause = null; } else { App.recordCause(q.subject, c); a.cause = c; }
             App.storage.setActiveSession(s);
             App.render();
           }
@@ -353,11 +376,10 @@
       wrap.appendChild(chipRow);
     }
 
-    // --- 4. Ask AI / Chat AI / Edit ---
+    // --- AI Row ---
     var aiRow = el('div', { class: 'row', style: 'flex-wrap:wrap;' }, [
       el('button', {
-        class: 'btn',
-        text: 'ถาม AI (คัดลอก)',
+        class: 'btn', text: 'ถาม AI (คัดลอก)',
         onclick: function () {
           var text = App.askai.buildAskAIText(q, order, answer.chosen, answer.confidence);
           App.askai.copyText(text).then(
@@ -366,34 +388,17 @@
           );
         }
       }),
-      el('button', {
-        class: 'btn btn-primary',
-        text: 'แชท AI',
-        onclick: function () {
-          App.chat.open(q, order, answer);
-        }
-      }),
-      el('button', {
-        class: 'btn btn-ghost',
-        text: 'แก้ไขข้อนี้',
-        onclick: function () { window.location.hash = '#/manage?edit=' + encodeURIComponent(q.id); }
-      })
+      el('button', { class: 'btn btn-primary', text: 'แชท AI', onclick: function () { App.chat.open(q, order, answer); } }),
+      el('button', { class: 'btn btn-ghost', text: 'แก้ไขข้อนี้', onclick: function () { window.location.hash = '#/manage?edit=' + encodeURIComponent(q.id); } })
     ]);
     wrap.appendChild(aiRow);
 
-    var s = App.storage.getActiveSession();
-    var isLast = s && s.index >= s.queue.length - 1;
+    // 🔥 ปุ่ม "ข้อถัดไป" ที่แสดงเสมอเมื่อดูเฉลยแล้ว
+    var isLast = session.index >= session.queue.length - 1;
     wrap.appendChild(el('button', {
       class: 'btn btn-primary btn-block',
       text: isLast ? 'ดูสรุป' : 'ข้อถัดไป',
-      onclick: function () {
-        var cur = App.storage.getActiveSession();
-        if (!cur) return;
-        cur.index = cur.index + 1;
-        App.storage.setActiveSession(cur);
-        if (cur.index >= cur.queue.length) { clearTimer(); finishSession(cur); }
-        else App.render();
-      }
+      onclick: function () { goNext(session); }
     }));
 
     return wrap;
@@ -437,5 +442,5 @@
 
   App.views.session = function (root) { renderSession(root); };
   App.views.session.startNew = startNew;
-  App.views.session.clearTimer = clearTimer; // 🔥 Export ฟังก์ชันนี้ให้ app.js เรียกใช้ได้
+  App.views.session.clearTimer = clearTimer;
 })();
